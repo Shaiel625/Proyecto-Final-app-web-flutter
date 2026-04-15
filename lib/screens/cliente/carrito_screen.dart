@@ -382,26 +382,46 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                     ),
                                   ),
                                   // Controles cantidad
-                                  Row(
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.remove_circle_outline),
-                                        color: AppTheme.primary,
-                                        onPressed: () =>
-                                            carrito.disminuirCantidad(item.producto),
-                                      ),
-                                      Text('${item.cantidad}',
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16)),
-                                      IconButton(
-                                        icon: const Icon(Icons.add_circle_outline),
-                                        color: AppTheme.primary,
-                                        onPressed: () =>
-                                            carrito.agregarProducto(item.producto),
-                                      ),
-                                    ],
-                                  ),
+Row(
+  children: [
+    IconButton(
+      icon: const Icon(Icons.remove_circle_outline),
+      color: AppTheme.primary,
+      onPressed: () =>
+          carrito.disminuirCantidad(item.producto),
+    ),
+    SizedBox(
+      width: 50,
+      child: TextField(
+        controller: TextEditingController(
+            text: '${item.cantidad}')
+          ..selection = TextSelection.collapsed(
+              offset: '${item.cantidad}'.length),
+        keyboardType: TextInputType.number,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+            fontWeight: FontWeight.bold, fontSize: 16),
+        decoration: const InputDecoration(
+          border: OutlineInputBorder(),
+          contentPadding: EdgeInsets.symmetric(vertical: 6),
+          isDense: true,
+        ),
+        onChanged: (v) {
+          final n = int.tryParse(v);
+          if (n != null && n > 0) {
+            carrito.actualizarCantidad(item.producto, n);
+          }
+        },
+      ),
+    ),
+    IconButton(
+      icon: const Icon(Icons.add_circle_outline),
+      color: AppTheme.primary,
+      onPressed: () =>
+          carrito.agregarProducto(item.producto),
+    ),
+  ],
+),
                                   SizedBox(
                                     width: 80,
                                     child: Text(
