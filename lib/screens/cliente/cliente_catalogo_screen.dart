@@ -1,50 +1,42 @@
 import 'package:flutter/material.dart';
-import '../../core/routes/app_routes.dart';
-import '../../core/theme/app_theme.dart';
 import '../../models/producto.dart';
-import '../../services/carrito_service.dart';
 import '../../services/producto_service.dart';
-import '../../services/session_service.dart';
-import '../../widgets/loading_view.dart';
-import '../../widgets/product_card.dart';
- 
+import '../../core/routes/app_routes.dart';
+import '../../services/carrito_service.dart';
+
 class ClienteCatalogoScreen extends StatefulWidget {
   const ClienteCatalogoScreen({super.key});
- 
+
   @override
   State<ClienteCatalogoScreen> createState() => _ClienteCatalogoScreenState();
 }
- 
+
 class _ClienteCatalogoScreenState extends State<ClienteCatalogoScreen> {
   late Future<List<Producto>> _futureProductos;
   final TextEditingController _searchCtrl = TextEditingController();
   String _search = '';
- 
+
   @override
   void initState() {
     super.initState();
     _futureProductos = ProductoService.obtenerProductos();
   }
- 
+
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
   }
- 
+
   void _recargarProductos() {
-    setState(() => _futureProductos = ProductoService.obtenerProductos());
+    setState(() {
+      _futureProductos = ProductoService.obtenerProductos();
+    });
   }
- 
-  Future<void> _cerrarSesion() async {
-    await SessionService.cerrarSesion();
-    CarritoService.instance.limpiar();
-    if (!mounted) return;
-    Navigator.pushReplacementNamed(context, AppRoutes.login);
-  }
- 
+
   List<Producto> _filtrar(List<Producto> productos) {
     if (_search.trim().isEmpty) return productos;
+
     final texto = _search.toLowerCase();
     return productos.where((p) {
       return p.nombre.toLowerCase().contains(texto) ||
@@ -53,144 +45,137 @@ class _ClienteCatalogoScreenState extends State<ClienteCatalogoScreen> {
           p.marca.toLowerCase().contains(texto);
     }).toList();
   }
- 
+
   Future<void> _seleccionarCantidad(Producto p) async {
     int cantidad = 1;
- 
+
     final cantidadSeleccionada = await showDialog<int>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
-          title: Text('Agregar ${p.nombre}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Stock disponible: ${p.stock}'),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: Text('Agregar ${p.nombre}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    onPressed: cantidad > 1
-                        ? () => setStateDialog(() => cantidad--)
-                        : null,
-                    icon: const Icon(Icons.remove_circle_outline),
-                  ),
-                  Container(
-                    width: 60,
-                    alignment: Alignment.center,
-                    child: Text(
-                      '$cantidad',
-                      style: const TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: cantidad < p.stock
-                        ? () => setStateDialog(() => cantidad++)
-                        : null,
-                    icon: const Icon(Icons.add_circle_outline),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, cantidad),
-              child: const Text('Agregar'),
-            ),
-          ],
-        ),
-      ),
-    );
- 
-    if (cantidadSeleccionada != null) {
-      // ✅ Llamada correcta al nuevo CarritoService.instance
-      CarritoService.instance.agregarProducto(p, cantidad: cantidadSeleccionada);
- 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${p.nombre} x$cantidadSeleccionada agregado al carrito'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
-    }
-  }
- 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Catálogo'),
-        leading: IconButton(
-          icon: const Icon(Icons.logout),
-          tooltip: 'Cerrar sesión',
-          onPressed: _cerrarSesion,
-        ),
-        actions: [
-          // Badge reactivo del carrito
-          ListenableBuilder(
-            listenable: CarritoService.instance,
-            builder: (context, _) {
-              final total = CarritoService.instance.totalProductos;
-              return Stack(
-                alignment: Alignment.topRight,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.shopping_cart_outlined),
-                    tooltip: 'Ver carrito',
-                    onPressed: () async {
-                      final actualizado = await Navigator.pushNamed(
-                          context, AppRoutes.carrito);
-                      if (actualizado == true) _recargarProductos();
-                    },
-                  ),
-                  if (total > 0)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
+                  Text('Stock disponible: ${p.stock}'),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        onPressed: cantidad > 1
+                            ? () {
+                                setStateDialog(() {
+                                  cantidad--;
+                                });
+                              }
+                            : null,
+                        icon: const Icon(Icons.remove_circle_outline),
+                      ),
+                      Container(
+                        width: 60,
+                        alignment: Alignment.center,
                         child: Text(
-                          '$total',
+                          '$cantidad',
                           style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                    ),
+                      IconButton(
+                        onPressed: cantidad < p.stock
+                            ? () {
+                                setStateDialog(() {
+                                  cantidad++;
+                                });
+                              }
+                            : null,
+                        icon: const Icon(Icons.add_circle_outline),
+                      ),
+                    ],
+                  ),
                 ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, cantidad),
+                  child: const Text('Agregar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (cantidadSeleccionada != null) {
+      CarritoService.instance.agregarProducto(
+        p,
+        cantidad: cantidadSeleccionada,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${p.nombre} x$cantidadSeleccionada agregado al carrito',
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1F4A7C),
+        title: const Text('Catálogo'),
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.logout),
+          onPressed: () {
+            Navigator.pushReplacementNamed(context, AppRoutes.login);
+          },
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.shopping_cart),
+            onPressed: () async {
+              final actualizado = await Navigator.pushNamed(
+                context,
+                AppRoutes.carrito,
               );
+
+              if (actualizado == true) {
+                _recargarProductos();
+              }
             },
           ),
           IconButton(
-            icon: const Icon(Icons.shopping_bag_outlined),
-            tooltip: 'Mis compras',
-            onPressed: () =>
-                Navigator.pushNamed(context, AppRoutes.clienteCompras),
+            icon: const Icon(Icons.shopping_bag),
+            onPressed: () {
+              Navigator.pushNamed(context, AppRoutes.clienteCompras);
+            },
           ),
           IconButton(
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'Perfil',
-            onPressed: () =>
-                Navigator.pushNamed(context, AppRoutes.clientePerfil),
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.pushNamed(context, AppRoutes.clientePerfil);
+            },
           ),
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             TextField(
@@ -200,7 +185,11 @@ class _ClienteCatalogoScreenState extends State<ClienteCatalogoScreen> {
                 prefixIcon: Icon(Icons.search),
                 border: OutlineInputBorder(),
               ),
-              onChanged: (v) => setState(() => _search = v),
+              onChanged: (value) {
+                setState(() {
+                  _search = value;
+                });
+              },
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -208,25 +197,27 @@ class _ClienteCatalogoScreenState extends State<ClienteCatalogoScreen> {
                 future: _futureProductos,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const LoadingView(mensaje: 'Cargando catálogo...');
+                    return const Center(child: CircularProgressIndicator());
                   }
- 
+
                   if (snapshot.hasError) {
-                    return ErrorView(
-                      mensaje: 'Error al cargar catálogo:\n${snapshot.error}',
-                      onReintentar: _recargarProductos,
+                    return Center(
+                      child: Text(
+                        'Error al cargar catálogo:\n${snapshot.error}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.red),
+                      ),
                     );
                   }
- 
+
                   final productos = _filtrar(snapshot.data ?? []);
- 
+
                   if (productos.isEmpty) {
-                    return const EmptyView(
-                      mensaje: 'No se encontraron productos',
-                      icono: Icons.storefront_outlined,
+                    return const Center(
+                      child: Text('No se encontraron productos'),
                     );
                   }
- 
+
                   return GridView.builder(
                     itemCount: productos.length,
                     gridDelegate:
@@ -236,11 +227,88 @@ class _ClienteCatalogoScreenState extends State<ClienteCatalogoScreen> {
                       mainAxisSpacing: 12,
                       mainAxisExtent: 360,
                     ),
-                    // ✅ Usa el widget reutilizable ProductCard
-                    itemBuilder: (context, index) => ProductCard(
-                      producto: productos[index],
-                      onAgregar: () => _seleccionarCantidad(productos[index]),
-                    ),
+                    itemBuilder: (context, index) {
+                      final p = productos[index];
+                      final sinStock = p.stock <= 0;
+
+                      return Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                height: 90,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: const Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: 52,
+                                  color: Color(0xFF1F4A7C),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                p.nombre,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Categoría: ${p.categoria}',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                'Marca: ${p.marca}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '\$${p.precioVenta.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1F4A7C),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                sinStock ? 'Sin stock' : 'Disponible',
+                                style: TextStyle(
+                                  color: sinStock ? Colors.red : Colors.green,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const Spacer(),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: sinStock
+                                      ? null
+                                      : () {
+                                          _seleccionarCantidad(p);
+                                        },
+                                  child: const Text('Agregar al carrito'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),

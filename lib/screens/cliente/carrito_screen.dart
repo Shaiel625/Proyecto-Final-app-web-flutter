@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/compra.dart';
 import '../../services/carrito_service.dart';
 import '../../services/session_service.dart';
 import '../../services/venta_service.dart';
-import '../../models/compra.dart';
+
 
 class CarritoScreen extends StatefulWidget {
   const CarritoScreen({super.key});
@@ -60,18 +61,22 @@ class _CarritoScreenState extends State<CarritoScreen> {
  
   Future<void> _mostrarVoucher(Compra venta, List itemsVoucher) async {
     final fechaStr = venta.fechaFormateada;
-    // Calcular total desde items del carrito si el backend no lo devuelve
-    double total = venta.total;
-    if (total == 0) {
+ 
+    // Calcular subtotal desde items del carrito
+    double subtotalVoucher = venta.total > 0 ? venta.total / 1.16 : 0;
+    if (subtotalVoucher == 0) {
       for (final item in itemsVoucher) {
-        total += item.producto.precioVenta * item.cantidad;
+        subtotalVoucher += item.producto.precioVenta * item.cantidad;
       }
     }
+    final ivaVoucher = subtotalVoucher * 0.16;
+    final totalVoucher = subtotalVoucher + ivaVoucher;
  
-    // Texto del voucher para copiar
+    // Texto del voucher para copiar/descargar
     final textoVoucher = StringBuffer();
     textoVoucher.writeln('============================');
-    textoVoucher.writeln('     POS FERRETERÍA');
+    textoVoucher.writeln('       FerreSmart');
+    textoVoucher.writeln('  Sistema de Punto de Venta');
     textoVoucher.writeln('============================');
     textoVoucher.writeln('Folio: ${venta.folio.isNotEmpty ? venta.folio : venta.id}');
     textoVoucher.writeln('Fecha: $fechaStr');
@@ -84,7 +89,10 @@ class _CarritoScreenState extends State<CarritoScreen> {
           '${item.producto.nombre} x${item.cantidad}  \$${subtotal.toStringAsFixed(2)}');
     }
     textoVoucher.writeln('----------------------------');
-    textoVoucher.writeln('TOTAL: \$${total.toStringAsFixed(2)}');
+    textoVoucher.writeln('Subtotal:    \$${subtotalVoucher.toStringAsFixed(2)}');
+    textoVoucher.writeln('IVA (16%):   \$${ivaVoucher.toStringAsFixed(2)}');
+    textoVoucher.writeln('----------------------------');
+    textoVoucher.writeln('TOTAL:       \$${totalVoucher.toStringAsFixed(2)}');
     textoVoucher.writeln('============================');
     textoVoucher.writeln('¡Gracias por su compra!');
  
@@ -108,40 +116,29 @@ class _CarritoScreenState extends State<CarritoScreen> {
               children: [
                 // Encabezado voucher
                 Container(
-  width: double.infinity,
-  padding: const EdgeInsets.all(16),
-  decoration: BoxDecoration(
-    color: AppTheme.primary.withOpacity(0.05),
-    borderRadius: BorderRadius.circular(12),
-    border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
-  ),
-  child: Column(
-    children: [
-      Image.asset(
-        'assets/images/logo.png',
-        height: 56,
-        errorBuilder: (_, __, ___) => const Icon(
-          Icons.storefront,
-          size: 40,
-          color: AppTheme.primary,
-        ),
-      ),
-      const SizedBox(height: 8),
-      const Text('FerreSmart',
-          style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-              color: AppTheme.primary,
-              letterSpacing: 1)),
-      const SizedBox(height: 2),
-      Text('VOUCHER DE COMPRA',
-          style: TextStyle(
-              fontSize: 11,
-              color: AppTheme.textSecondary,
-              letterSpacing: 1.5)),
-    ],
-  ),
-),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text('POS FERRETERÍA',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: AppTheme.primary)),
+                      const SizedBox(height: 4),
+                      Text('VOUCHER DE COMPRA',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                              letterSpacing: 1.5)),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 16),
  
                 // Folio y fecha
@@ -183,6 +180,26 @@ class _CarritoScreenState extends State<CarritoScreen> {
                 }),
  
                 const Divider(),
+                // Subtotal
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Subtotal', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    Text('\$${subtotalVoucher.toStringAsFixed(2)}',
+                        style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                // IVA
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('IVA (16%)', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    Text('\$${ivaVoucher.toStringAsFixed(2)}',
+                        style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                  ],
+                ),
+                const Divider(),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -190,7 +207,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                         style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 16)),
                     Text(
-                      '\$${total.toStringAsFixed(2)}',
+                      '\$${totalVoucher.toStringAsFixed(2)}',
                       style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
@@ -220,6 +237,21 @@ class _CarritoScreenState extends State<CarritoScreen> {
                 const SnackBar(
                     content: Text('Voucher copiado al portapapeles'),
                     backgroundColor: AppTheme.success),
+              );
+            },
+          ),
+          TextButton.icon(
+            icon: const Icon(Icons.download_outlined),
+            label: const Text('Descargar'),
+            onPressed: () {
+              final folio = venta.folio.isNotEmpty ? venta.folio : venta.id;
+              Clipboard.setData(ClipboardData(text: textoVoucher.toString()));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Voucher $folio copiado — pégalo en un bloc de notas para guardar'),
+                  backgroundColor: AppTheme.primary,
+                  duration: const Duration(seconds: 4),
+                ),
               );
             },
           ),
@@ -414,6 +446,26 @@ class _CarritoScreenState extends State<CarritoScreen> {
                             ],
                           ),
                           const SizedBox(height: 12),
+                          // Subtotal
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Subtotal:', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                              Text('\$${(total / 1.16).toStringAsFixed(2)}',
+                                  style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          // IVA
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('IVA (16%):', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                              Text('\$${(total - total / 1.16).toStringAsFixed(2)}',
+                                  style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                            ],
+                          ),
+                          const Divider(height: 16),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
