@@ -120,63 +120,100 @@ class _PosScreenState extends State<PosScreen> {
  
   Future<void> _mostrarDialogoCantidad(Producto producto) async {
     int cantidad = 1;
+    final ctrl = TextEditingController(text: '1');
+    final formKey = GlobalKey<FormState>();
  
     await showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            void actualizar(int nuevo) {
+              if (nuevo < 1) nuevo = 1;
+              if (nuevo > producto.stock) nuevo = producto.stock;
+              cantidad = nuevo;
+              ctrl.text = '$nuevo';
+              ctrl.selection = TextSelection.fromPosition(
+                  TextPosition(offset: ctrl.text.length));
+              setDialogState(() {});
+            }
+ 
             return AlertDialog(
               title: const Text('Agregar producto'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    producto.nombre,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text('Stock disponible: ${producto.stock}'),
-                  const SizedBox(height: 18),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        onPressed: cantidad > 1
-                            ? () {
-                                setDialogState(() {
-                                  cantidad--;
-                                });
-                              }
-                            : null,
-                        icon: const Icon(Icons.remove_circle_outline),
-                      ),
-                      SizedBox(
-                        width: 60,
-                        child: Center(
-                          child: Text(
-                            '$cantidad',
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(producto.nombre,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 4),
+                    Text('Precio: \$${producto.precioVenta.toStringAsFixed(2)}',
+                        style: const TextStyle(color: Color(0xFF1F4A7C))),
+                    const SizedBox(height: 4),
+                    Text('Stock disponible: ${producto.stock}',
+                        style: const TextStyle(color: Colors.grey)),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          onPressed: cantidad > 1 ? () => actualizar(cantidad - 1) : null,
+                          icon: const Icon(Icons.remove_circle_outline, size: 28),
+                          color: const Color(0xFF1F4A7C),
+                        ),
+                        SizedBox(
+                          width: 80,
+                          child: TextFormField(
+                            controller: ctrl,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(vertical: 8),
                             ),
+                            onChanged: (v) {
+                              final n = int.tryParse(v);
+                              if (n != null) actualizar(n);
+                            },
+                            validator: (v) {
+                              final n = int.tryParse(v ?? '');
+                              if (n == null || n < 1) return 'Mín 1';
+                              if (n > producto.stock) return 'Máx ${producto.stock}';
+                              return null;
+                            },
                           ),
                         ),
+                        IconButton(
+                          onPressed: cantidad < producto.stock ? () => actualizar(cantidad + 1) : null,
+                          icon: const Icon(Icons.add_circle_outline, size: 28),
+                          color: const Color(0xFF1F4A7C),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Subtotal preview
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1F4A7C).withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      IconButton(
-                        onPressed: cantidad < producto.stock
-                            ? () {
-                                setDialogState(() {
-                                  cantidad++;
-                                });
-                              }
-                            : null,
-                        icon: const Icon(Icons.add_circle_outline),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Subtotal:', style: TextStyle(fontWeight: FontWeight.w600)),
+                          Text(
+                            '\$${(producto.precioVenta * cantidad).toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1F4A7C)),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -185,8 +222,10 @@ class _PosScreenState extends State<PosScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    _agregarAlCarrito(producto, cantidad);
-                    Navigator.pop(context);
+                    if (formKey.currentState!.validate()) {
+                      _agregarAlCarrito(producto, cantidad);
+                      Navigator.pop(context);
+                    }
                   },
                   child: const Text('Agregar'),
                 ),
@@ -368,12 +407,16 @@ class _PosScreenState extends State<PosScreen> {
     }
   }
  
-  double get _total {
+  double get _subtotal {
     return _carrito.fold(
       0,
       (sum, item) => sum + (item.producto.precioVenta * item.cantidad),
     );
   }
+ 
+  double get _iva => _subtotal * 0.16;
+ 
+  double get _total => _subtotal + _iva;
  
   double get _totalConvertido => _total * _tasaCambio;
  
@@ -930,15 +973,32 @@ class _PosScreenState extends State<PosScreen> {
                   ),
           ),
           const SizedBox(height: 12),
+          // Subtotal
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Subtotal:', style: TextStyle(fontSize: 15, color: Colors.grey)),
+              Text('\$${_subtotal.toStringAsFixed(2)}',
+                  style: const TextStyle(fontSize: 15, color: Colors.grey)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // IVA
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('IVA (16%):', style: TextStyle(fontSize: 15, color: Colors.grey)),
+              Text('\$${_iva.toStringAsFixed(2)}',
+                  style: const TextStyle(fontSize: 15, color: Colors.grey)),
+            ],
+          ),
+          const Divider(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
                 'Total MXN:',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               Flexible(
                 child: Text(
@@ -959,10 +1019,7 @@ class _PosScreenState extends State<PosScreen> {
             children: [
               Text(
                 'Total $_divisaSeleccionada:',
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
               ),
               Flexible(
                 child: Text(
