@@ -1,0 +1,5 @@
+#!/bin/bash
+git clone https://github.com/flutter/flutter.git --depth 1 -b stable flutter
+flutter/bin/flutter config --enable-web
+flutter/bin/flutter pub get
+flutter/bin/flutter build web --dart-define=BACKEND_URL=$BACKEND_URL --dart-define=PRODUCTOS_URL=$PRODUCTOS_URL
