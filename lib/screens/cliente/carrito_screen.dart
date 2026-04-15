@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/carrito_service.dart';
 import '../../services/session_service.dart';
 import '../../services/venta_service.dart';
- 
+import '../../models/compra.dart';
+
 class CarritoScreen extends StatefulWidget {
   const CarritoScreen({super.key});
  
@@ -12,7 +14,6 @@ class CarritoScreen extends StatefulWidget {
 }
  
 class _CarritoScreenState extends State<CarritoScreen> {
-  // El cliente solo puede pagar con Tarjeta
   final String _metodoPago = 'Tarjeta';
   bool _procesando = false;
  
@@ -26,7 +27,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
       final sesion = await SessionService.obtenerSesion();
       final nombreCliente = sesion?['nombre'] ?? 'Cliente mostrador';
  
-      await VentaService.registrarVenta(
+      final venta = await VentaService.registrarVenta(
         vendedor: 'App Cliente',
         cliente: nombreCliente,
         metodoPago: _metodoPago,
@@ -38,15 +39,14 @@ class _CarritoScreenState extends State<CarritoScreen> {
             .toList(),
       );
  
+      // Guardar items antes de limpiar para el voucher
+      final itemsVoucher = List.from(carrito.items);
       carrito.limpiar();
  
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('¡Compra realizada correctamente!'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
+      await _mostrarVoucher(venta, itemsVoucher);
+ 
+      if (!mounted) return;
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
@@ -58,20 +58,210 @@ class _CarritoScreenState extends State<CarritoScreen> {
     }
   }
  
+  Future<void> _mostrarVoucher(Compra venta, List itemsVoucher) async {
+    final fechaStr = venta.fechaFormateada;
+    // Calcular total desde items del carrito si el backend no lo devuelve
+    double total = venta.total;
+    if (total == 0) {
+      for (final item in itemsVoucher) {
+        total += item.producto.precioVenta * item.cantidad;
+      }
+    }
+ 
+    // Texto del voucher para copiar
+    final textoVoucher = StringBuffer();
+    textoVoucher.writeln('============================');
+    textoVoucher.writeln('     POS FERRETERÍA');
+    textoVoucher.writeln('============================');
+    textoVoucher.writeln('Folio: ${venta.folio.isNotEmpty ? venta.folio : venta.id}');
+    textoVoucher.writeln('Fecha: $fechaStr');
+    textoVoucher.writeln('Cliente: ${venta.cliente}');
+    textoVoucher.writeln('Método de pago: ${venta.metodoPago}');
+    textoVoucher.writeln('----------------------------');
+    for (final item in itemsVoucher) {
+      final subtotal = item.producto.precioVenta * item.cantidad;
+      textoVoucher.writeln(
+          '${item.producto.nombre} x${item.cantidad}  \$${subtotal.toStringAsFixed(2)}');
+    }
+    textoVoucher.writeln('----------------------------');
+    textoVoucher.writeln('TOTAL: \$${total.toStringAsFixed(2)}');
+    textoVoucher.writeln('============================');
+    textoVoucher.writeln('¡Gracias por su compra!');
+ 
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.check_circle, color: AppTheme.success, size: 28),
+            const SizedBox(width: 8),
+            const Text('¡Compra exitosa!'),
+          ],
+        ),
+        content: SizedBox(
+          width: 360,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Encabezado voucher
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text('POS FERRETERÍA',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: AppTheme.primary)),
+                      const SizedBox(height: 4),
+                      Text('VOUCHER DE COMPRA',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                              letterSpacing: 1.5)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+ 
+                // Folio y fecha
+                _filaVoucher('Folio',
+                    venta.folio.isNotEmpty ? venta.folio : venta.id),
+                _filaVoucher('Fecha', fechaStr),
+                _filaVoucher('Cliente', venta.cliente),
+                _filaVoucher('Método de pago', venta.metodoPago),
+ 
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(),
+                ),
+ 
+                // Items
+                const Text('Productos',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 8),
+                ...itemsVoucher.map((item) {
+                  final subtotal = item.producto.precioVenta * item.cantidad;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${item.producto.nombre} x${item.cantidad}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                        Text(
+                          '\$${subtotal.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+ 
+                const Divider(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('TOTAL',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(
+                      '\$${total.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: AppTheme.primary),
+                    ),
+                  ],
+                ),
+ 
+                const SizedBox(height: 16),
+                Center(
+                  child: Text('¡Gracias por su compra!',
+                      style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontStyle: FontStyle.italic)),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.copy_outlined),
+            label: const Text('Copiar'),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: textoVoucher.toString()));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Voucher copiado al portapapeles'),
+                    backgroundColor: AppTheme.success),
+              );
+            },
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.check),
+            label: const Text('Cerrar'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+ 
+  Widget _filaVoucher(String label, String valor) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(label,
+                style: const TextStyle(
+                    color: AppTheme.textSecondary, fontSize: 13)),
+          ),
+          Expanded(
+            child: Text(valor,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+ 
   void _confirmarLimpiar() {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Vaciar carrito'),
-        content: const Text('¿Estás seguro de que quieres eliminar todos los productos?'),
+        title: const Text('¿Vaciar carrito?'),
+        content: const Text('Se eliminarán todos los productos del carrito.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
           TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             onPressed: () {
               CarritoService.instance.limpiar();
               Navigator.pop(context);
+              setState(() {});
             },
-            child: const Text('Vaciar', style: TextStyle(color: AppTheme.error)),
+            child: const Text('Vaciar', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -80,19 +270,24 @@ class _CarritoScreenState extends State<CarritoScreen> {
  
   @override
   Widget build(BuildContext context) {
+    final carrito = CarritoService.instance;
+ 
     return ListenableBuilder(
-      listenable: CarritoService.instance,
+      listenable: carrito,
       builder: (context, _) {
-        final carrito = CarritoService.instance;
         final items = carrito.items;
+        final total = items.fold<double>(
+          0,
+          (sum, item) => sum + item.producto.precioVenta * item.cantidad,
+        );
  
         return Scaffold(
           appBar: AppBar(
-            title: Text('Carrito (${carrito.totalProductos})'),
+            title: const Text('Mi carrito'),
             actions: [
               if (items.isNotEmpty)
                 IconButton(
-                  icon: const Icon(Icons.delete_forever),
+                  icon: const Icon(Icons.delete_outline),
                   tooltip: 'Vaciar carrito',
                   onPressed: _confirmarLimpiar,
                 ),
@@ -101,12 +296,13 @@ class _CarritoScreenState extends State<CarritoScreen> {
           body: items.isEmpty
               ? const Center(
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.black26),
-                      SizedBox(height: 12),
+                      Icon(Icons.shopping_cart_outlined,
+                          size: 72, color: Colors.grey),
+                      SizedBox(height: 16),
                       Text('Tu carrito está vacío',
-                          style: TextStyle(color: AppTheme.textSecondary)),
+                          style: TextStyle(fontSize: 18, color: Colors.grey)),
                     ],
                   ),
                 )
@@ -114,11 +310,12 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   children: [
                     Expanded(
                       child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        padding: const EdgeInsets.all(16),
                         itemCount: items.length,
                         itemBuilder: (context, index) {
                           final item = items[index];
-                          final p = item.producto;
+                          final subtotal =
+                              item.producto.precioVenta * item.cantidad;
                           return Card(
                             margin: const EdgeInsets.only(bottom: 10),
                             child: Padding(
@@ -127,43 +324,49 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                 children: [
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Text(p.nombre,
+                                        Text(item.producto.nombre,
                                             style: const TextStyle(
-                                                fontWeight: FontWeight.bold, fontSize: 15)),
-                                        const SizedBox(height: 4),
-                                        Text('Precio: \$${p.precioVenta.toStringAsFixed(2)}'),
-                                        Text('Subtotal: \$${item.subtotal.toStringAsFixed(2)}',
+                                                fontWeight: FontWeight.bold)),
+                                        Text(
+                                            '\$${item.producto.precioVenta.toStringAsFixed(2)} c/u',
                                             style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: AppTheme.success)),
+                                                color: AppTheme.textSecondary,
+                                                fontSize: 13)),
                                       ],
                                     ),
                                   ),
+                                  // Controles cantidad
                                   Row(
                                     children: [
                                       IconButton(
                                         icon: const Icon(Icons.remove_circle_outline),
+                                        color: AppTheme.primary,
                                         onPressed: () =>
-                                            CarritoService.instance.disminuirCantidad(p),
+                                            carrito.disminuirCantidad(item.producto),
                                       ),
                                       Text('${item.cantidad}',
                                           style: const TextStyle(
-                                              fontSize: 16, fontWeight: FontWeight.bold)),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16)),
                                       IconButton(
                                         icon: const Icon(Icons.add_circle_outline),
-                                        onPressed: item.cantidad < p.stock
-                                            ? () =>
-                                                CarritoService.instance.aumentarCantidad(p)
-                                            : null,
+                                        color: AppTheme.primary,
+                                        onPressed: () =>
+                                            carrito.agregarProducto(item.producto),
                                       ),
                                     ],
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.redAccent),
-                                    onPressed: () =>
-                                        CarritoService.instance.eliminarProducto(p),
+                                  SizedBox(
+                                    width: 80,
+                                    child: Text(
+                                      '\$${subtotal.toStringAsFixed(2)}',
+                                      textAlign: TextAlign.end,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -172,73 +375,64 @@ class _CarritoScreenState extends State<CarritoScreen> {
                         },
                       ),
                     ),
- 
-                    // Panel inferior fijo
+                    // Total y botón pagar
                     Container(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius:
-                            const BorderRadius.vertical(top: Radius.circular(20)),
+                        color: Colors.white,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 8,
-                            offset: const Offset(0, -2),
-                          ),
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, -4))
                         ],
                       ),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Método de pago
                           Row(
                             children: [
-                              const Icon(Icons.credit_card, color: AppTheme.primary),
+                              const Icon(Icons.credit_card,
+                                  color: AppTheme.primary),
                               const SizedBox(width: 8),
-                              const Text('Método de pago:',
-                                  style: TextStyle(fontWeight: FontWeight.w600)),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text('Tarjeta',
-                                    style: TextStyle(
-                                        color: AppTheme.primary,
-                                        fontWeight: FontWeight.bold)),
-                              ),
+                              const Text('Método de pago: '),
+                              Text(_metodoPago,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primary)),
                             ],
                           ),
                           const SizedBox(height: 12),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Total:', style: TextStyle(fontSize: 18)),
-                              Text(
-                                '\$${carrito.totalCarrito.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.primary),
-                              ),
+                              const Text('Total:',
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold)),
+                              Text('\$${total.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primary)),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
                           SizedBox(
                             width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton(
+                            height: 50,
+                            child: ElevatedButton.icon(
                               onPressed: _procesando ? null : _comprarTodo,
-                              child: _procesando
+                              icon: _procesando
                                   ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
+                                      width: 20,
+                                      height: 20,
                                       child: CircularProgressIndicator(
-                                          strokeWidth: 2.5, color: Colors.white),
-                                    )
+                                          strokeWidth: 2.5,
+                                          color: Colors.white))
+                                  : const Icon(Icons.shopping_bag_outlined),
+                              label: _procesando
+                                  ? const Text('Procesando...')
                                   : const Text('Confirmar compra',
                                       style: TextStyle(fontSize: 16)),
                             ),
