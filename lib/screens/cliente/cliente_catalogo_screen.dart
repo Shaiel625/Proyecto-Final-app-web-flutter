@@ -6,37 +6,37 @@ import '../../services/carrito_service.dart';
 
 class ClienteCatalogoScreen extends StatefulWidget {
   const ClienteCatalogoScreen({super.key});
-
+ 
   @override
   State<ClienteCatalogoScreen> createState() => _ClienteCatalogoScreenState();
 }
-
+ 
 class _ClienteCatalogoScreenState extends State<ClienteCatalogoScreen> {
   late Future<List<Producto>> _futureProductos;
   final TextEditingController _searchCtrl = TextEditingController();
   String _search = '';
-
+ 
   @override
   void initState() {
     super.initState();
     _futureProductos = ProductoService.obtenerProductos();
   }
-
+ 
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
   }
-
+ 
   void _recargarProductos() {
     setState(() {
       _futureProductos = ProductoService.obtenerProductos();
     });
   }
-
+ 
   List<Producto> _filtrar(List<Producto> productos) {
     if (_search.trim().isEmpty) return productos;
-
+ 
     final texto = _search.toLowerCase();
     return productos.where((p) {
       return p.nombre.toLowerCase().contains(texto) ||
@@ -45,10 +45,10 @@ class _ClienteCatalogoScreenState extends State<ClienteCatalogoScreen> {
           p.marca.toLowerCase().contains(texto);
     }).toList();
   }
-
+ 
   Future<void> _seleccionarCantidad(Producto p) async {
     int cantidad = 1;
-
+ 
     final cantidadSeleccionada = await showDialog<int>(
       context: context,
       builder: (context) {
@@ -114,15 +114,15 @@ class _ClienteCatalogoScreenState extends State<ClienteCatalogoScreen> {
         );
       },
     );
-
+ 
     if (cantidadSeleccionada != null) {
       CarritoService.instance.agregarProducto(
         p,
         cantidad: cantidadSeleccionada,
       );
-
+ 
       if (!mounted) return;
-
+ 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -132,7 +132,7 @@ class _ClienteCatalogoScreenState extends State<ClienteCatalogoScreen> {
       );
     }
   }
-
+ 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -154,7 +154,7 @@ class _ClienteCatalogoScreenState extends State<ClienteCatalogoScreen> {
                 context,
                 AppRoutes.carrito,
               );
-
+ 
               if (actualizado == true) {
                 _recargarProductos();
               }
@@ -199,7 +199,7 @@ class _ClienteCatalogoScreenState extends State<ClienteCatalogoScreen> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-
+ 
                   if (snapshot.hasError) {
                     return Center(
                       child: Text(
@@ -209,15 +209,15 @@ class _ClienteCatalogoScreenState extends State<ClienteCatalogoScreen> {
                       ),
                     );
                   }
-
+ 
                   final productos = _filtrar(snapshot.data ?? []);
-
+ 
                   if (productos.isEmpty) {
                     return const Center(
                       child: Text('No se encontraron productos'),
                     );
                   }
-
+ 
                   return GridView.builder(
                     itemCount: productos.length,
                     gridDelegate:
@@ -230,7 +230,7 @@ class _ClienteCatalogoScreenState extends State<ClienteCatalogoScreen> {
                     itemBuilder: (context, index) {
                       final p = productos[index];
                       final sinStock = p.stock <= 0;
-
+ 
                       return Card(
                         elevation: 4,
                         shape: RoundedRectangleBorder(
