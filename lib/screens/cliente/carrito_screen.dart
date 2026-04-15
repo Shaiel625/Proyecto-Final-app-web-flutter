@@ -108,29 +108,40 @@ class _CarritoScreenState extends State<CarritoScreen> {
               children: [
                 // Encabezado voucher
                 Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text('POS FERRETERÍA',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                              color: AppTheme.primary)),
-                      const SizedBox(height: 4),
-                      Text('VOUCHER DE COMPRA',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondary,
-                              letterSpacing: 1.5)),
-                    ],
-                  ),
-                ),
+  width: double.infinity,
+  padding: const EdgeInsets.all(16),
+  decoration: BoxDecoration(
+    color: AppTheme.primary.withOpacity(0.05),
+    borderRadius: BorderRadius.circular(12),
+    border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+  ),
+  child: Column(
+    children: [
+      Image.asset(
+        'assets/images/logo.png',
+        height: 56,
+        errorBuilder: (_, __, ___) => const Icon(
+          Icons.storefront,
+          size: 40,
+          color: AppTheme.primary,
+        ),
+      ),
+      const SizedBox(height: 8),
+      const Text('FerreSmart',
+          style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              color: AppTheme.primary,
+              letterSpacing: 1)),
+      const SizedBox(height: 2),
+      Text('VOUCHER DE COMPRA',
+          style: TextStyle(
+              fontSize: 11,
+              color: AppTheme.textSecondary,
+              letterSpacing: 1.5)),
+    ],
+  ),
+),
                 const SizedBox(height: 16),
  
                 // Folio y fecha
