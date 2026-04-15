@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/routes/app_routes.dart';
+import '../../core/theme/app_theme.dart';
 import '../../models/usuario.dart';
 import '../../services/auth_service.dart';
 import '../../services/session_service.dart';
@@ -14,7 +15,6 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-
   final TextEditingController _usuarioCtrl = TextEditingController();
   final TextEditingController _passwordCtrl = TextEditingController();
 
@@ -30,7 +30,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _iniciarSesion() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _cargando = true);
 
     try {
@@ -40,9 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       await SessionService.guardarSesion(usuario);
-
       if (!mounted) return;
-
       setState(() => _cargando = false);
 
       if (usuario.rol == 'admin') {
@@ -54,145 +51,163 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-
       setState(() => _cargando = false);
-
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
       );
     }
   }
 
   void _abrirRegistro() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const RegisterScreen(),
-      ),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen()));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Card(
-              elevation: 6,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.storefront,
-                        size: 64,
-                        color: Color(0xFF1F4A7C),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'POS Ferretería',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1F4A7C),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Inicia sesión con tu cuenta',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.black54),
-                      ),
-                      const SizedBox(height: 24),
-
-                      TextFormField(
-                        controller: _usuarioCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Usuario',
-                          prefixIcon: Icon(Icons.person_outline),
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Ingresa tu usuario';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      TextFormField(
-                        controller: _passwordCtrl,
-                        obscureText: _ocultarPassword,
-                        decoration: InputDecoration(
-                          labelText: 'Contraseña',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          border: const OutlineInputBorder(),
-                          suffixIcon: IconButton(
-                            onPressed: () {
-                              setState(() {
-                                _ocultarPassword = !_ocultarPassword;
-                              });
-                            },
-                            icon: Icon(
-                              _ocultarPassword
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF0D2B5E), Color(0xFF1F4A7C), Color(0xFF2E6DB4)],
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Card(
+                elevation: 12,
+                shadowColor: Colors.black38,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 32, vertical: 36),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // ── Logo ──────────────────────────────────────
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primary.withOpacity(0.2),
+                                blurRadius: 20,
+                                spreadRadius: 4,
+                              )
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: Image.asset(
+                              'assets/images/logo.png',
+                              height: 90,
+                              width: 90,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                height: 90,
+                                width: 90,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.storefront,
+                                    size: 48, color: AppTheme.primary),
+                              ),
                             ),
                           ),
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Ingresa tu contraseña';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 24),
+                        const SizedBox(height: 16),
 
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: _cargando ? null : _iniciarSesion,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1F4A7C),
-                            foregroundColor: Colors.white,
+                        // ── Nombre ────────────────────────────────────
+                        const Text(
+                          'FerreSmart',
+                          style: TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primary,
+                            letterSpacing: 1,
                           ),
-                          child: _cargando
-                              ? const SizedBox(
-                                  height: 22,
-                                  width: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text(
-                                  'Iniciar sesión',
-                                  style: TextStyle(fontSize: 16),
-                                ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Sistema de Punto de Venta',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.textSecondary,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 28),
 
-                      TextButton(
-                        onPressed: _abrirRegistro,
-                        child: const Text('¿No tienes cuenta? Crear cuenta'),
-                      ),
-                    ],
+                        // ── Usuario ───────────────────────────────────
+                        TextFormField(
+                          controller: _usuarioCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Usuario',
+                            prefixIcon: Icon(Icons.person_outline),
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Ingresa tu usuario'
+                              : null,
+                        ),
+                        const SizedBox(height: 16),
+
+                        // ── Contraseña ────────────────────────────────
+                        TextFormField(
+                          controller: _passwordCtrl,
+                          obscureText: _ocultarPassword,
+                          decoration: InputDecoration(
+                            labelText: 'Contraseña',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            border: const OutlineInputBorder(),
+                            suffixIcon: IconButton(
+                              onPressed: () => setState(
+                                  () => _ocultarPassword = !_ocultarPassword),
+                              icon: Icon(_ocultarPassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off),
+                            ),
+                          ),
+                          validator: (v) => (v == null || v.isEmpty)
+                              ? 'Ingresa tu contraseña'
+                              : null,
+                        ),
+                        const SizedBox(height: 28),
+
+                        // ── Botón iniciar sesión ──────────────────────
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _cargando ? null : _iniciarSesion,
+                            child: _cargando
+                                ? const SizedBox(
+                                    height: 22,
+                                    width: 22,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white))
+                                : const Text('Iniciar sesión',
+                                    style: TextStyle(fontSize: 16)),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // ── Registro ──────────────────────────────────
+                        TextButton(
+                          onPressed: _abrirRegistro,
+                          child: const Text('¿No tienes cuenta? Crear cuenta'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
