@@ -714,39 +714,89 @@ class _PosScreenState extends State<PosScreen> {
             builder: (context, snapshot) {
               final clientes = snapshot.data ?? [];
  
-              return DropdownButtonFormField<String>(
-                value: _clienteSeleccionado?.id.toString() ?? 'MOSTRADOR',
-                decoration: InputDecoration(
-                  labelText: 'Cliente',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                items: [
-                  const DropdownMenuItem(
-                    value: 'MOSTRADOR',
-                    child: Text('Cliente mostrador'),
-                  ),
-                  ...clientes.map(
-                    (cliente) => DropdownMenuItem(
-                      value: cliente.id.toString(),
-                      child: Text(cliente.nombre),
+              return Autocomplete<Cliente>(
+                optionsBuilder: (TextEditingValue textValue) {
+                  if (textValue.text.isEmpty) {
+                    return clientes;
+                  }
+                  final texto = textValue.text.toLowerCase();
+                  return clientes.where((c) =>
+                      c.nombre.toLowerCase().contains(texto) ||
+                      c.correo.toLowerCase().contains(texto));
+                },
+                displayStringForOption: (c) => c.nombre,
+                onSelected: (c) {
+                  setState(() => _clienteSeleccionado = c);
+                },
+                fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+                  // Si hay cliente seleccionado, mostrar su nombre
+                  if (_clienteSeleccionado != null &&
+                      controller.text.isEmpty) {
+                    controller.text = _clienteSeleccionado!.nombre;
+                  }
+                  return TextFormField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    enabled: !_procesandoVenta,
+                    decoration: InputDecoration(
+                      labelText: 'Buscar cliente',
+                      hintText: 'Cliente mostrador',
+                      prefixIcon: const Icon(Icons.person_search_outlined),
+                      suffixIcon: _clienteSeleccionado != null
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              tooltip: 'Limpiar (Cliente mostrador)',
+                              onPressed: () {
+                                setState(() => _clienteSeleccionado = null);
+                                controller.clear();
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
-                  ),
-                ],
-                onChanged: _procesandoVenta
-                    ? null
-                    : (value) {
-                        setState(() {
-                          if (value == null || value == 'MOSTRADOR') {
-                            _clienteSeleccionado = null;
-                          } else {
-                            _clienteSeleccionado = clientes.firstWhere(
-                              (c) => c.id.toString() == value,
+                  );
+                },
+                optionsViewBuilder: (context, onSelected, options) {
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      elevation: 4,
+                      borderRadius: BorderRadius.circular(12),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 220),
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: options.length,
+                          itemBuilder: (context, index) {
+                            final c = options.elementAt(index);
+                            return ListTile(
+                              leading: CircleAvatar(
+                                radius: 16,
+                                backgroundColor:
+                                    const Color(0xFF1F4A7C).withOpacity(0.1),
+                                child: Text(
+                                  c.nombre.isNotEmpty
+                                      ? c.nombre[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                      color: Color(0xFF1F4A7C),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              title: Text(c.nombre),
+                              subtitle: Text(c.correo,
+                                  style: const TextStyle(fontSize: 12)),
+                              onTap: () => onSelected(c),
                             );
-                          }
-                        });
-                      },
+                          },
+                        ),
+                      ),
+                    ),
+                  );
+                },
               );
             },
           ),

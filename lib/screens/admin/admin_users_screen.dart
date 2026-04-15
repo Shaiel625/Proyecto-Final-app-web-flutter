@@ -3,65 +3,96 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/password_validator.dart';
 import '../../services/usuario_service.dart';
 import '../../widgets/loading_view.dart';
- 
+
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
- 
+
   @override
   State<AdminUsersScreen> createState() => _AdminUsersScreenState();
 }
- 
+
 class _AdminUsersScreenState extends State<AdminUsersScreen> {
   late Future<List<UsuarioCompleto>> _futureUsuarios;
   final TextEditingController _searchCtrl = TextEditingController();
   String _search = '';
- 
+  String _filtroRol = 'Todos';
+
+  final List<String> _roles = ['Todos', 'Administrador', 'Vendedor', 'Cliente'];
+
   @override
   void initState() {
     super.initState();
     _futureUsuarios = UsuarioService.obtenerUsuarios();
   }
- 
+
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
   }
- 
+
   void _recargar() {
     setState(() => _futureUsuarios = UsuarioService.obtenerUsuarios());
   }
- 
+
   List<UsuarioCompleto> _filtrar(List<UsuarioCompleto> lista) {
-    if (_search.trim().isEmpty) return lista;
-    final texto = _search.toLowerCase();
-    return lista.where((u) =>
-        u.nombre.toLowerCase().contains(texto) ||
-        u.correo.toLowerCase().contains(texto) ||
-        u.rol.toLowerCase().contains(texto)).toList();
+    var result = lista;
+
+    if (_filtroRol != 'Todos') {
+      result = result
+          .where((u) => _etiquetaRol(u.rol) == _filtroRol)
+          .toList();
+    }
+
+    if (_search.trim().isNotEmpty) {
+      final texto = _search.toLowerCase();
+      result = result
+          .where((u) =>
+              u.nombre.toLowerCase().contains(texto) ||
+              u.correo.toLowerCase().contains(texto) ||
+              u.rol.toLowerCase().contains(texto))
+          .toList();
+    }
+
+    return result;
   }
- 
+
   String _etiquetaRol(String rol) {
     switch (rol.toUpperCase()) {
-      case 'ADMIN': return 'Administrador';
-      case 'VENDEDOR': return 'Vendedor';
-      default: return 'Cliente';
+      case 'ADMIN':
+        return 'Administrador';
+      case 'VENDEDOR':
+        return 'Vendedor';
+      default:
+        return 'Cliente';
     }
   }
- 
+
+  Color _colorRol(String rol) {
+    switch (rol.toUpperCase()) {
+      case 'ADMIN':
+        return Colors.purple;
+      case 'VENDEDOR':
+        return Colors.orange;
+      default:
+        return AppTheme.primary;
+    }
+  }
+
   Future<void> _mostrarFormulario({UsuarioCompleto? usuario}) async {
     final esEdicion = usuario != null;
     final formKey = GlobalKey<FormState>();
     final nombreCtrl = TextEditingController(text: usuario?.nombre ?? '');
     final correoCtrl = TextEditingController(text: usuario?.correo ?? '');
-    final telefonoCtrl = TextEditingController(text: usuario?.telefono ?? '');
+    final telefonoCtrl =
+        TextEditingController(text: usuario?.telefono ?? '');
     final passwordCtrl = TextEditingController();
     String rolSeleccionado = usuario?.rol.toUpperCase() == 'ADMIN'
         ? 'ADMIN'
         : usuario?.rol.toUpperCase() == 'VENDEDOR'
             ? 'VENDEDOR'
             : 'CLIENTE';
- 
+
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -79,8 +110,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: TextFormField(
                         controller: nombreCtrl,
-                        decoration: const InputDecoration(labelText: 'Nombre completo', border: OutlineInputBorder()),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Campo requerido' : null,
+                        decoration: const InputDecoration(
+                            labelText: 'Nombre completo',
+                            border: OutlineInputBorder()),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Campo requerido'
+                            : null,
                       ),
                     ),
                     Padding(
@@ -88,9 +123,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       child: TextFormField(
                         controller: correoCtrl,
                         keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(labelText: 'Correo electrónico', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(
+                            labelText: 'Correo electrónico',
+                            border: OutlineInputBorder()),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Campo requerido';
+                          if (v == null || v.trim().isEmpty)
+                            return 'Campo requerido';
                           if (!v.contains('@')) return 'Correo inválido';
                           return null;
                         },
@@ -101,7 +139,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       child: TextFormField(
                         controller: telefonoCtrl,
                         keyboardType: TextInputType.phone,
-                        decoration: const InputDecoration(labelText: 'Teléfono (opcional)', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(
+                            labelText: 'Teléfono (opcional)',
+                            border: OutlineInputBorder()),
                       ),
                     ),
                     if (!esEdicion)
@@ -110,19 +150,26 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         child: TextFormField(
                           controller: passwordCtrl,
                           obscureText: true,
-                          decoration: const InputDecoration(labelText: 'Contraseña', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                              labelText: 'Contraseña',
+                              border: OutlineInputBorder()),
                           validator: PasswordValidator.validar,
                         ),
                       ),
                     DropdownButtonFormField<String>(
                       value: rolSeleccionado,
-                      decoration: const InputDecoration(labelText: 'Rol', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                          labelText: 'Rol', border: OutlineInputBorder()),
                       items: const [
-                        DropdownMenuItem(value: 'ADMIN', child: Text('Administrador')),
-                        DropdownMenuItem(value: 'VENDEDOR', child: Text('Vendedor')),
-                        DropdownMenuItem(value: 'CLIENTE', child: Text('Cliente')),
+                        DropdownMenuItem(
+                            value: 'ADMIN', child: Text('Administrador')),
+                        DropdownMenuItem(
+                            value: 'VENDEDOR', child: Text('Vendedor')),
+                        DropdownMenuItem(
+                            value: 'CLIENTE', child: Text('Cliente')),
                       ],
-                      onChanged: (v) => setDlgState(() => rolSeleccionado = v ?? rolSeleccionado),
+                      onChanged: (v) =>
+                          setDlgState(() => rolSeleccionado = v ?? rolSeleccionado),
                     ),
                   ],
                 ),
@@ -130,7 +177,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar')),
             ElevatedButton(
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
@@ -142,6 +191,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       nombre: nombreCtrl.text.trim(),
                       correo: correoCtrl.text.trim(),
                       rol: rolSeleccionado,
+                      esCliente: usuario.esCliente,
                     );
                   } else {
                     await UsuarioService.crearUsuario(
@@ -154,7 +204,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   }
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(esEdicion ? 'Usuario actualizado' : 'Usuario creado'),
+                    content: Text(
+                        esEdicion ? 'Usuario actualizado' : 'Usuario creado'),
                     backgroundColor: AppTheme.success,
                   ));
                   _recargar();
@@ -173,18 +224,23 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       ),
     );
   }
- 
+
   Future<void> _toggleEstado(UsuarioCompleto u) async {
     final accion = u.activo ? 'desactivar' : 'activar';
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('¿${accion[0].toUpperCase()}${accion.substring(1)} usuario?'),
+        title: Text(
+            '¿${accion[0].toUpperCase()}${accion.substring(1)} usuario?'),
         content: Text('¿Estás seguro de que quieres $accion a ${u.nombre}?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: u.activo ? AppTheme.error : AppTheme.success),
+            style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    u.activo ? AppTheme.error : AppTheme.success),
             onPressed: () => Navigator.pop(context, true),
             child: Text(accion[0].toUpperCase() + accion.substring(1)),
           ),
@@ -193,26 +249,32 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     );
     if (confirmar != true) return;
     try {
-      await UsuarioService.cambiarEstado(id: u.id, activo: !u.activo);
+      await UsuarioService.cambiarEstado(
+          id: u.id, activo: !u.activo, esCliente: u.esCliente);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Usuario ${u.activo ? 'desactivado' : 'activado'}'),
+        content:
+            Text('Usuario ${u.activo ? 'desactivado' : 'activado'}'),
         backgroundColor: AppTheme.success,
       ));
       _recargar();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'), backgroundColor: AppTheme.error));
     }
   }
- 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Usuarios'),
         actions: [
-          IconButton(onPressed: _recargar, icon: const Icon(Icons.refresh), tooltip: 'Recargar'),
+          IconButton(
+              onPressed: _recargar,
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Recargar'),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -226,6 +288,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // Buscador
             TextField(
               controller: _searchCtrl,
               decoration: const InputDecoration(
@@ -235,7 +298,36 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               ),
               onChanged: (v) => setState(() => _search = v),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
+            // Filtro por rol
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _roles.map((rol) {
+                  final seleccionado = _filtroRol == rol;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(rol),
+                      selected: seleccionado,
+                      onSelected: (_) =>
+                          setState(() => _filtroRol = rol),
+                      selectedColor: AppTheme.primary.withOpacity(0.15),
+                      checkmarkColor: AppTheme.primary,
+                      labelStyle: TextStyle(
+                        color: seleccionado
+                            ? AppTheme.primary
+                            : AppTheme.textSecondary,
+                        fontWeight: seleccionado
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 10),
             Expanded(
               child: FutureBuilder<List<UsuarioCompleto>>(
                 future: _futureUsuarios,
@@ -244,49 +336,71 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                     return const LoadingView(mensaje: 'Cargando usuarios...');
                   }
                   if (snapshot.hasError) {
-                    return ErrorView(mensaje: '${snapshot.error}', onReintentar: _recargar);
+                    return ErrorView(
+                        mensaje: '${snapshot.error}',
+                        onReintentar: _recargar);
                   }
- 
+
                   final usuarios = _filtrar(snapshot.data ?? []);
                   if (usuarios.isEmpty) {
-                    return const EmptyView(mensaje: 'No se encontraron usuarios', icono: Icons.people_outline);
+                    return const EmptyView(
+                        mensaje: 'No se encontraron usuarios',
+                        icono: Icons.people_outline);
                   }
- 
+
                   return ListView.builder(
                     itemCount: usuarios.length,
                     itemBuilder: (context, index) {
                       final u = usuarios[index];
+                      final etiqueta = _etiquetaRol(u.rol);
+                      final colorRol = _colorRol(u.rol);
                       return Card(
                         margin: const EdgeInsets.only(bottom: 10),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                           child: Row(
                             children: [
                               // Avatar
                               CircleAvatar(
-                                backgroundColor: AppTheme.primary.withOpacity(0.1),
+                                backgroundColor:
+                                    colorRol.withOpacity(0.12),
                                 child: Text(
-                                  u.nombre.isNotEmpty ? u.nombre[0].toUpperCase() : '?',
-                                  style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold),
+                                  u.nombre.isNotEmpty
+                                      ? u.nombre[0].toUpperCase()
+                                      : '?',
+                                  style: TextStyle(
+                                      color: colorRol,
+                                      fontWeight: FontWeight.bold),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               // Datos
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
                                   children: [
-                                    Text(u.nombre, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                    Text(u.nombre,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15)),
                                     const SizedBox(height: 2),
-                                    Text(u.correo, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                                    Text(u.correo,
+                                        style: const TextStyle(
+                                            color: AppTheme.textSecondary,
+                                            fontSize: 13)),
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
-                                        AppTheme.statusBadge(_etiquetaRol(u.rol), AppTheme.primary),
+                                        AppTheme.statusBadge(
+                                            etiqueta, colorRol),
                                         const SizedBox(width: 8),
                                         AppTheme.statusBadge(
                                           u.activo ? 'Activo' : 'Inactivo',
-                                          u.activo ? AppTheme.success : AppTheme.error,
+                                          u.activo
+                                              ? AppTheme.success
+                                              : AppTheme.error,
                                         ),
                                       ],
                                     ),
@@ -295,16 +409,23 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                               ),
                               // Acciones
                               IconButton(
-                                icon: const Icon(Icons.edit_outlined, color: AppTheme.primary),
+                                icon: const Icon(Icons.edit_outlined,
+                                    color: AppTheme.primary),
                                 tooltip: 'Editar',
-                                onPressed: () => _mostrarFormulario(usuario: u),
+                                onPressed: () =>
+                                    _mostrarFormulario(usuario: u),
                               ),
                               IconButton(
                                 icon: Icon(
-                                  u.activo ? Icons.person_off_outlined : Icons.person_outlined,
-                                  color: u.activo ? AppTheme.error : AppTheme.success,
+                                  u.activo
+                                      ? Icons.person_off_outlined
+                                      : Icons.person_outlined,
+                                  color: u.activo
+                                      ? AppTheme.error
+                                      : AppTheme.success,
                                 ),
-                                tooltip: u.activo ? 'Desactivar' : 'Activar',
+                                tooltip:
+                                    u.activo ? 'Desactivar' : 'Activar',
                                 onPressed: () => _toggleEstado(u),
                               ),
                             ],
