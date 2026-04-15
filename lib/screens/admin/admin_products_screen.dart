@@ -42,7 +42,6 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
         p.marca.toLowerCase().contains(texto)).toList();
   }
  
-  // ── Diálogo: Agregar stock ────────────────────────────────────────────────
   Future<void> _mostrarDialogoAgregarStock(Producto p) async {
     final ctrl = TextEditingController(text: '1');
     final formKey = GlobalKey<FormState>();
@@ -107,7 +106,6 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
     }
   }
  
-  // ── Diálogo: Nuevo producto ───────────────────────────────────────────────
   Future<void> _mostrarDialogoNuevoProducto() async {
     final formKey = GlobalKey<FormState>();
     final campos = {
@@ -235,7 +233,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
         foregroundColor: Colors.white,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             TextField(
@@ -245,9 +243,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                 prefixIcon: Icon(Icons.search),
                 border: OutlineInputBorder(),
               ),
-              onChanged: (v) {
-                setState(() => _search = v);
-              },
+              onChanged: (v) => setState(() => _search = v),
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -266,71 +262,67 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                     return const EmptyView(mensaje: 'No se encontraron productos', icono: Icons.inventory_2_outlined);
                   }
  
-                  return LayoutBuilder(
-                    builder: (context, constraints) {
-                      if (constraints.maxWidth > 850) {
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            columns: const [
-                              DataColumn(label: Text('Código')),
-                              DataColumn(label: Text('Nombre')),
-                              DataColumn(label: Text('Categoría')),
-                              DataColumn(label: Text('Marca')),
-                              DataColumn(label: Text('Precio')),
-                              DataColumn(label: Text('Stock')),
-                              DataColumn(label: Text('Acciones')),
-                            ],
-                            rows: productos.map((p) {
-                              final stockBajo = p.stock <= p.stockMinimo;
-                              return DataRow(cells: [
-                                DataCell(Text(p.codigo)),
-                                DataCell(Text(p.nombre)),
-                                DataCell(Text(p.categoria)),
-                                DataCell(Text(p.marca)),
-                                DataCell(Text('\$${p.precioVenta.toStringAsFixed(2)}')),
-                                DataCell(Text(
-                                  p.stock.toString(),
-                                  style: TextStyle(
-                                    color: stockBajo ? AppTheme.error : AppTheme.success,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )),
-                                DataCell(
-                                  IconButton(
-                                    icon: const Icon(Icons.add_box_outlined, color: AppTheme.primary),
-                                    tooltip: 'Agregar stock',
-                                    onPressed: () => _mostrarDialogoAgregarStock(p),
-                                  ),
-                                ),
-                              ]);
-                            }).toList(),
-                          ),
-                        );
-                      }
- 
-                      return ListView.builder(
-                        itemCount: productos.length,
-                        itemBuilder: (context, index) {
-                          final p = productos[index];
-                          final stockBajo = p.stock <= p.stockMinimo;
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            child: ListTile(
-                              title: Text(p.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text(
-                                'Código: ${p.codigo}\nCategoría: ${p.categoria}\nMarca: ${p.marca}\n'
-                                'Precio: \$${p.precioVenta.toStringAsFixed(2)}\nStock: ${p.stock}',
+                  return ListView.builder(
+                    itemCount: productos.length,
+                    itemBuilder: (context, index) {
+                      final p = productos[index];
+                      final stockBajo = p.stock <= p.stockMinimo;
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              // Ícono
+                              CircleAvatar(
+                                backgroundColor: AppTheme.primary.withOpacity(0.1),
+                                child: const Icon(Icons.inventory_2_outlined, color: AppTheme.primary, size: 20),
                               ),
-                              trailing: IconButton(
+                              const SizedBox(width: 12),
+                              // Datos
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(p.nombre, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                    const SizedBox(height: 4),
+                                    Text('${p.codigo} · ${p.categoria} · ${p.marca}',
+                                        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Text('\$${p.precioVenta.toStringAsFixed(2)}',
+                                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                                        const SizedBox(width: 12),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: (stockBajo ? AppTheme.error : AppTheme.success).withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            'Stock: ${p.stock}',
+                                            style: TextStyle(
+                                              color: stockBajo ? AppTheme.error : AppTheme.success,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Botón agregar stock
+                              IconButton(
                                 icon: const Icon(Icons.add_box_outlined, color: AppTheme.primary),
                                 tooltip: 'Agregar stock',
                                 onPressed: () => _mostrarDialogoAgregarStock(p),
                               ),
-                              isThreeLine: true,
-                            ),
-                          );
-                        },
+                            ],
+                          ),
+                        ),
                       );
                     },
                   );

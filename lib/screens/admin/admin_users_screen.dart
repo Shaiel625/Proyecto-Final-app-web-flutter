@@ -49,7 +49,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     }
   }
  
-  // ── Diálogo: Crear / Editar usuario ──────────────────────────────────────
   Future<void> _mostrarFormulario({UsuarioCompleto? usuario}) async {
     final esEdicion = usuario != null;
     final formKey = GlobalKey<FormState>();
@@ -76,7 +75,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Nombre
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: TextFormField(
@@ -85,7 +83,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         validator: (v) => (v == null || v.trim().isEmpty) ? 'Campo requerido' : null,
                       ),
                     ),
-                    // Correo
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: TextFormField(
@@ -99,7 +96,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         },
                       ),
                     ),
-                    // Teléfono
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: TextFormField(
@@ -108,7 +104,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         decoration: const InputDecoration(labelText: 'Teléfono (opcional)', border: OutlineInputBorder()),
                       ),
                     ),
-                    // Contraseña (solo en creación)
                     if (!esEdicion)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
@@ -119,7 +114,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           validator: PasswordValidator.validar,
                         ),
                       ),
-                    // Rol
                     DropdownButtonFormField<String>(
                       value: rolSeleccionado,
                       decoration: const InputDecoration(labelText: 'Rol', border: OutlineInputBorder()),
@@ -180,7 +174,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     );
   }
  
-  // ── Diálogo: Confirmar cambio de estado ───────────────────────────────────
   Future<void> _toggleEstado(UsuarioCompleto u) async {
     final accion = u.activo ? 'desactivar' : 'activar';
     final confirmar = await showDialog<bool>(
@@ -259,27 +252,48 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                     return const EmptyView(mensaje: 'No se encontraron usuarios', icono: Icons.people_outline);
                   }
  
-                  return LayoutBuilder(builder: (context, constraints) {
-                    if (constraints.maxWidth > 800) {
-                      return SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          columns: const [
-                            DataColumn(label: Text('Nombre')),
-                            DataColumn(label: Text('Correo')),
-                            DataColumn(label: Text('Rol')),
-                            DataColumn(label: Text('Estado')),
-                            DataColumn(label: Text('Acciones')),
-                          ],
-                          rows: usuarios.map((u) => DataRow(cells: [
-                            DataCell(Text(u.nombre)),
-                            DataCell(Text(u.correo)),
-                            DataCell(Text(_etiquetaRol(u.rol))),
-                            DataCell(AppTheme.statusBadge(
-                              u.activo ? 'Activo' : 'Inactivo',
-                              u.activo ? AppTheme.success : AppTheme.error,
-                            )),
-                            DataCell(Row(children: [
+                  return ListView.builder(
+                    itemCount: usuarios.length,
+                    itemBuilder: (context, index) {
+                      final u = usuarios[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          child: Row(
+                            children: [
+                              // Avatar
+                              CircleAvatar(
+                                backgroundColor: AppTheme.primary.withOpacity(0.1),
+                                child: Text(
+                                  u.nombre.isNotEmpty ? u.nombre[0].toUpperCase() : '?',
+                                  style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // Datos
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(u.nombre, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                    const SizedBox(height: 2),
+                                    Text(u.correo, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        AppTheme.statusBadge(_etiquetaRol(u.rol), AppTheme.primary),
+                                        const SizedBox(width: 8),
+                                        AppTheme.statusBadge(
+                                          u.activo ? 'Activo' : 'Inactivo',
+                                          u.activo ? AppTheme.success : AppTheme.error,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Acciones
                               IconButton(
                                 icon: const Icon(Icons.edit_outlined, color: AppTheme.primary),
                                 tooltip: 'Editar',
@@ -293,54 +307,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                 tooltip: u.activo ? 'Desactivar' : 'Activar',
                                 onPressed: () => _toggleEstado(u),
                               ),
-                            ])),
-                          ])).toList(),
+                            ],
+                          ),
                         ),
                       );
-                    }
- 
-                    return ListView.builder(
-                      itemCount: usuarios.length,
-                      itemBuilder: (context, index) {
-                        final u = usuarios[index];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: AppTheme.primary.withOpacity(0.1),
-                              child: Text(
-                                u.nombre.isNotEmpty ? u.nombre[0].toUpperCase() : '?',
-                                style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            title: Text(u.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('${u.correo}\nRol: ${_etiquetaRol(u.rol)}'),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                AppTheme.statusBadge(
-                                  u.activo ? 'Activo' : 'Inactivo',
-                                  u.activo ? AppTheme.success : AppTheme.error,
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined, color: AppTheme.primary),
-                                  onPressed: () => _mostrarFormulario(usuario: u),
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    u.activo ? Icons.person_off_outlined : Icons.person_outlined,
-                                    color: u.activo ? AppTheme.error : AppTheme.success,
-                                  ),
-                                  onPressed: () => _toggleEstado(u),
-                                ),
-                              ],
-                            ),
-                            isThreeLine: true,
-                          ),
-                        );
-                      },
-                    );
-                  });
+                    },
+                  );
                 },
               ),
             ),
