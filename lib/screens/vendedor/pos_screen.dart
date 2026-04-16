@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../models/compra.dart';
+import '../../core/theme/app_theme.dart';
 import '../../models/cliente.dart';
 import '../../models/producto.dart';
 import '../../services/cliente_service.dart';
@@ -6,39 +9,39 @@ import '../../services/divisa_service.dart';
 import '../../services/producto_service.dart';
 import '../../services/venta_service.dart';
 import '../../services/session_service.dart';
- 
+
 class PosScreen extends StatefulWidget {
   const PosScreen({super.key});
- 
+
   @override
   State<PosScreen> createState() => _PosScreenState();
 }
- 
+
 class _PosScreenState extends State<PosScreen> {
   late Future<List<Producto>> _futureProductos;
   late Future<List<Cliente>> _futureClientes;
   late Future<List<DivisaInfo>> _futureDivisas;
- 
+
   final TextEditingController _searchCtrl = TextEditingController();
   String _search = '';
- 
+
   final List<_CartItem> _carrito = [];
   bool _procesandoVenta = false;
- 
+
   Cliente? _clienteSeleccionado;
   String _metodoPagoSeleccionado = 'Efectivo';
   String _divisaSeleccionada = 'MXN';
- 
+
   final List<String> _metodosPago = [
     'Efectivo',
     'Tarjeta',
     'Transferencia',
   ];
- 
+
   double _tasaCambio = 1.0;
   String _fechaTasa = '';
   bool _cargandoTasa = false;
- 
+
   @override
   void initState() {
     super.initState();
@@ -47,19 +50,19 @@ class _PosScreenState extends State<PosScreen> {
     _futureDivisas = DivisaService.obtenerMonedasDisponibles();
     _cargarTasaCambio();
   }
- 
+
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
   }
- 
+
   void _recargarProductos() {
     setState(() {
       _futureProductos = ProductoService.obtenerProductos();
     });
   }
- 
+
   Future<void> _cargarTasaCambio() async {
     if (_divisaSeleccionada == 'MXN') {
       if (!mounted) return;
@@ -70,19 +73,19 @@ class _PosScreenState extends State<PosScreen> {
       });
       return;
     }
- 
+
     setState(() {
       _cargandoTasa = true;
     });
- 
+
     try {
       final conversion = await DivisaService.obtenerTasa(
         base: 'MXN',
         target: _divisaSeleccionada,
       );
- 
+
       if (!mounted) return;
- 
+
       setState(() {
         _tasaCambio = conversion.rate;
         _fechaTasa = conversion.date;
@@ -90,13 +93,13 @@ class _PosScreenState extends State<PosScreen> {
       });
     } catch (e) {
       if (!mounted) return;
- 
+
       setState(() {
         _tasaCambio = 1.0;
         _fechaTasa = '';
         _cargandoTasa = false;
       });
- 
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No se pudo cargar la divisa: $e'),
@@ -105,10 +108,10 @@ class _PosScreenState extends State<PosScreen> {
       );
     }
   }
- 
+
   List<Producto> _filtrar(List<Producto> productos) {
     if (_search.trim().isEmpty) return productos;
- 
+
     final texto = _search.toLowerCase();
     return productos.where((p) {
       return p.nombre.toLowerCase().contains(texto) ||
@@ -117,12 +120,12 @@ class _PosScreenState extends State<PosScreen> {
           p.marca.toLowerCase().contains(texto);
     }).toList();
   }
- 
+
   Future<void> _mostrarDialogoCantidad(Producto producto) async {
     int cantidad = 1;
     final ctrl = TextEditingController(text: '1');
     final formKey = GlobalKey<FormState>();
- 
+
     await showDialog(
       context: context,
       builder: (context) {
@@ -137,7 +140,7 @@ class _PosScreenState extends State<PosScreen> {
                   TextPosition(offset: ctrl.text.length));
               setDialogState(() {});
             }
- 
+
             return AlertDialog(
               title: const Text('Agregar producto'),
               content: Form(
@@ -236,14 +239,14 @@ class _PosScreenState extends State<PosScreen> {
       },
     );
   }
- 
+
   void _agregarAlCarrito(Producto producto, int cantidad) {
     final index = _carrito.indexWhere((item) => item.producto.id == producto.id);
- 
+
     setState(() {
       if (index >= 0) {
         final nuevaCantidad = _carrito[index].cantidad + cantidad;
- 
+
         if (nuevaCantidad <= producto.stock) {
           _carrito[index].cantidad = nuevaCantidad;
         } else {
@@ -266,7 +269,7 @@ class _PosScreenState extends State<PosScreen> {
       }
     });
   }
- 
+
   void _incrementarCantidad(_CartItem item) {
     setState(() {
       if (item.cantidad < item.producto.stock) {
@@ -282,7 +285,7 @@ class _PosScreenState extends State<PosScreen> {
       }
     });
   }
- 
+
   void _disminuirCantidad(_CartItem item) {
     setState(() {
       if (item.cantidad > 1) {
@@ -292,17 +295,17 @@ class _PosScreenState extends State<PosScreen> {
       }
     });
   }
- 
+
   void _quitarDelCarrito(_CartItem item) {
     setState(() {
       _carrito.remove(item);
     });
   }
- 
+
   Future<void> _seleccionarDivisaConBuscador(List<DivisaInfo> divisas) async {
     final searchCtrl = TextEditingController();
     List<DivisaInfo> filtradas = List.from(divisas);
- 
+
     final seleccionada = await showDialog<DivisaInfo>(
       context: context,
       builder: (context) {
@@ -326,7 +329,7 @@ class _PosScreenState extends State<PosScreen> {
                       ),
                       onChanged: (value) {
                         final texto = value.toLowerCase().trim();
- 
+
                         setDialogState(() {
                           filtradas = divisas.where((divisa) {
                             return divisa.codigo.toLowerCase().contains(texto) ||
@@ -347,7 +350,7 @@ class _PosScreenState extends State<PosScreen> {
                                 final divisa = filtradas[index];
                                 final esActual =
                                     divisa.codigo == _divisaSeleccionada;
- 
+
                                 return ListTile(
                                   leading: CircleAvatar(
                                     backgroundColor: esActual
@@ -396,9 +399,9 @@ class _PosScreenState extends State<PosScreen> {
         );
       },
     );
- 
+
     searchCtrl.dispose();
- 
+
     if (seleccionada != null && seleccionada.codigo != _divisaSeleccionada) {
       setState(() {
         _divisaSeleccionada = seleccionada.codigo;
@@ -406,20 +409,20 @@ class _PosScreenState extends State<PosScreen> {
       await _cargarTasaCambio();
     }
   }
- 
+
   double get _subtotal {
     return _carrito.fold(
       0,
       (sum, item) => sum + (item.producto.precioVenta * item.cantidad),
     );
   }
- 
+
   double get _iva => _subtotal * 0.16;
- 
+
   double get _total => _subtotal + _iva;
- 
+
   double get _totalConvertido => _total * _tasaCambio;
- 
+
   Future<void> _confirmarVenta() async {
     if (_carrito.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -427,16 +430,16 @@ class _PosScreenState extends State<PosScreen> {
       );
       return;
     }
- 
+
     setState(() {
       _procesandoVenta = true;
     });
- 
+
     try {
       final sesion = await SessionService.obtenerSesion();
       final nombreVendedor = sesion?['nombre'] ?? 'Vendedor';
- 
-      await VentaService.registrarVenta(
+
+      final venta = await VentaService.registrarVenta(
         vendedor: nombreVendedor,
         cliente: _clienteSeleccionado?.nombre ?? 'Cliente mostrador',
         metodoPago: _metodoPagoSeleccionado,
@@ -449,13 +452,14 @@ class _PosScreenState extends State<PosScreen> {
             )
             .toList(),
       );
- 
+
+      final itemsVoucher = List<_CartItem>.from(_carrito);
       final totalVenta = _total;
       final totalDivisa = _totalConvertido;
       final divisa = _divisaSeleccionada;
- 
+
       if (!mounted) return;
- 
+
       setState(() {
         _carrito.clear();
         _clienteSeleccionado = null;
@@ -465,25 +469,18 @@ class _PosScreenState extends State<PosScreen> {
         _fechaTasa = '';
         _procesandoVenta = false;
       });
- 
+
       _recargarProductos();
- 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            divisa == 'MXN'
-                ? 'Venta registrada. Total: \$${totalVenta.toStringAsFixed(2)} MXN'
-                : 'Venta registrada. Total: \$${totalVenta.toStringAsFixed(2)} MXN / ${totalDivisa.toStringAsFixed(2)} $divisa',
-          ),
-        ),
-      );
+
+      // Mostrar voucher
+      await _mostrarVoucher(venta, itemsVoucher, totalVenta, totalDivisa, divisa);
     } catch (e) {
       if (!mounted) return;
- 
+
       setState(() {
         _procesandoVenta = false;
       });
- 
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No se pudo completar la venta: $e'),
@@ -492,7 +489,168 @@ class _PosScreenState extends State<PosScreen> {
       );
     }
   }
- 
+
+
+  Future<void> _mostrarVoucher(Compra venta, List<_CartItem> items,
+      double totalMXN, double totalDivisa, String divisa) async {
+    final fechaStr = venta.fechaFormateada;
+    final subtotal = totalMXN / 1.16;
+    final iva = totalMXN - subtotal;
+    final folio = venta.folio.isNotEmpty ? venta.folio : venta.id;
+
+    final textoVoucher = StringBuffer();
+    textoVoucher.writeln('============================');
+    textoVoucher.writeln('       FerreSmart');
+    textoVoucher.writeln('  Sistema de Punto de Venta');
+    textoVoucher.writeln('============================');
+    textoVoucher.writeln('Folio: $folio');
+    textoVoucher.writeln('Fecha: $fechaStr');
+    textoVoucher.writeln('Vendedor: ${venta.vendedor}');
+    textoVoucher.writeln('Cliente: ${venta.cliente}');
+    textoVoucher.writeln('Método de pago: ${venta.metodoPago}');
+    textoVoucher.writeln('----------------------------');
+    for (final item in items) {
+      final s = item.producto.precioVenta * item.cantidad;
+      textoVoucher.writeln('${item.producto.nombre} x${item.cantidad}  \$${s.toStringAsFixed(2)}');
+    }
+    textoVoucher.writeln('----------------------------');
+    textoVoucher.writeln('Subtotal:    \$${subtotal.toStringAsFixed(2)}');
+    textoVoucher.writeln('IVA (16%):   \$${iva.toStringAsFixed(2)}');
+    if (divisa != 'MXN') {
+      textoVoucher.writeln('Total MXN:   \$${totalMXN.toStringAsFixed(2)}');
+      textoVoucher.writeln('Total $divisa:  ${totalDivisa.toStringAsFixed(2)}');
+    } else {
+      textoVoucher.writeln('TOTAL:       \$${totalMXN.toStringAsFixed(2)}');
+    }
+    textoVoucher.writeln('============================');
+    textoVoucher.writeln('¡Gracias por su compra!');
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 28),
+            SizedBox(width: 8),
+            Text('¡Venta registrada!'),
+          ],
+        ),
+        content: SizedBox(
+          width: 380,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1F4A7C).withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF1F4A7C).withOpacity(0.2)),
+                  ),
+                  child: const Column(
+                    children: [
+                      Text('FerreSmart',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1F4A7C))),
+                      SizedBox(height: 2),
+                      Text('VOUCHER DE VENTA',
+                          style: TextStyle(fontSize: 11, color: Colors.grey, letterSpacing: 1.5)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _filaVoucher('Folio', folio),
+                _filaVoucher('Fecha', fechaStr),
+                _filaVoucher('Vendedor', venta.vendedor),
+                _filaVoucher('Cliente', venta.cliente),
+                _filaVoucher('Método pago', venta.metodoPago),
+                const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider()),
+                const Text('Productos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 6),
+                ...items.map((item) {
+                  final s = item.producto.precioVenta * item.cantidad;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text('${item.producto.nombre} x${item.cantidad}',
+                            style: const TextStyle(fontSize: 13))),
+                        Text('\$${s.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      ],
+                    ),
+                  );
+                }),
+                const Divider(),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  const Text('Subtotal', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                  Text('\$${subtotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                ]),
+                const SizedBox(height: 4),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  const Text('IVA (16%)', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                  Text('\$${iva.toStringAsFixed(2)}', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                ]),
+                const Divider(),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  const Text('TOTAL MXN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  Text('\$${totalMXN.toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF1F4A7C))),
+                ]),
+                if (divisa != 'MXN') ...[
+                  const SizedBox(height: 4),
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    Text('Total $divisa', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    Text(totalDivisa.toStringAsFixed(2),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF1F4A7C))),
+                  ]),
+                ],
+                const SizedBox(height: 14),
+                const Center(child: Text('¡Gracias por su compra!',
+                    style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic))),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.copy_outlined),
+            label: const Text('Copiar'),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: textoVoucher.toString()));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Voucher copiado'), backgroundColor: Colors.green),
+              );
+            },
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.check),
+            label: const Text('Cerrar'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filaVoucher(String label, String valor) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 100, child: Text(label,
+              style: const TextStyle(color: Colors.grey, fontSize: 13))),
+          Expanded(child: Text(valor,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+        ],
+      ),
+    );
+  }
+
   Future<void> _cobrar() async {
     if (_carrito.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -500,7 +658,7 @@ class _PosScreenState extends State<PosScreen> {
       );
       return;
     }
- 
+
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -551,11 +709,11 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
- 
+
   @override
   Widget build(BuildContext context) {
     final esAncho = MediaQuery.of(context).size.width > 980;
- 
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Punto de Venta'),
@@ -569,7 +727,7 @@ class _PosScreenState extends State<PosScreen> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
- 
+
           if (snapshot.hasError) {
             return Center(
               child: Text(
@@ -579,9 +737,9 @@ class _PosScreenState extends State<PosScreen> {
               ),
             );
           }
- 
+
           final productos = _filtrar(snapshot.data ?? []);
- 
+
           if (esAncho) {
             return Row(
               children: [
@@ -600,7 +758,7 @@ class _PosScreenState extends State<PosScreen> {
               ],
             );
           }
- 
+
           return Column(
             children: [
               Expanded(
@@ -616,7 +774,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
- 
+
   Widget _buildProductos(List<Producto> productos) {
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -657,7 +815,7 @@ class _PosScreenState extends State<PosScreen> {
                     itemBuilder: (context, index) {
                       final producto = productos[index];
                       final sinStock = producto.stock <= 0;
- 
+
                       return Card(
                         elevation: 3,
                         shape: RoundedRectangleBorder(
@@ -736,7 +894,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
- 
+
   Widget _buildCarrito() {
     return Container(
       color: Colors.white,
@@ -756,7 +914,7 @@ class _PosScreenState extends State<PosScreen> {
             future: _futureClientes,
             builder: (context, snapshot) {
               final clientes = snapshot.data ?? [];
- 
+
               return Autocomplete<Cliente>(
                 optionsBuilder: (TextEditingValue textValue) {
                   if (textValue.text.isEmpty) {
@@ -875,7 +1033,7 @@ class _PosScreenState extends State<PosScreen> {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const LinearProgressIndicator();
               }
- 
+
               if (snapshot.hasError) {
                 return Container(
                   width: double.infinity,
@@ -891,16 +1049,16 @@ class _PosScreenState extends State<PosScreen> {
                   ),
                 );
               }
- 
+
               final divisas = snapshot.data ?? [
                 DivisaInfo(codigo: 'MXN', nombre: 'Peso mexicano', simbolo: '\$'),
               ];
- 
+
               if (!divisas.any((d) => d.codigo == _divisaSeleccionada)) {
                 _divisaSeleccionada =
                     divisas.any((d) => d.codigo == 'MXN') ? 'MXN' : divisas.first.codigo;
               }
- 
+
               final divisaActual = divisas.firstWhere(
                 (d) => d.codigo == _divisaSeleccionada,
                 orElse: () => DivisaInfo(
@@ -909,7 +1067,7 @@ class _PosScreenState extends State<PosScreen> {
                   simbolo: '',
                 ),
               );
- 
+
               return InkWell(
                 onTap: _procesandoVenta
                     ? null
@@ -1055,7 +1213,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
- 
+
   Widget _buildCartItem(_CartItem item) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1112,11 +1270,11 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 }
- 
+
 class _CartItem {
   final Producto producto;
   int cantidad;
- 
+
   _CartItem({
     required this.producto,
     required this.cantidad,
