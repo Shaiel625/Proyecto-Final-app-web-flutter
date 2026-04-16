@@ -9,6 +9,9 @@ import '../../services/divisa_service.dart';
 import '../../services/producto_service.dart';
 import '../../services/venta_service.dart';
 import '../../services/session_service.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class PosScreen extends StatefulWidget {
   const PosScreen({super.key});
@@ -626,6 +629,74 @@ class _PosScreenState extends State<PosScreen> {
               );
             },
           ),
+          TextButton.icon(
+  icon: const Icon(Icons.picture_as_pdf_outlined),
+  label: const Text('PDF'),
+  onPressed: () async {
+    final doc = pw.Document();
+    doc.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Center(child: pw.Text('FerreSmart',
+                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold))),
+              pw.Center(child: pw.Text('VOUCHER DE VENTA',
+                  style: const pw.TextStyle(fontSize: 12))),
+              pw.Divider(),
+              pw.Text('Folio: $folio'),
+              pw.Text('Fecha: $fechaStr'),
+              pw.Text('Vendedor: ${venta.vendedor}'),
+              pw.Text('Cliente: ${venta.cliente}'),
+              pw.Text('Método de pago: ${venta.metodoPago}'),
+              pw.Divider(),
+              pw.Text('Productos:',
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 4),
+              ...items.map((item) {
+                final s = item.producto.precioVenta * item.cantidad;
+                return pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('${item.producto.nombre} x${item.cantidad}'),
+                    pw.Text('\$${s.toStringAsFixed(2)}'),
+                  ],
+                );
+              }),
+              pw.Divider(),
+              pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [pw.Text('Subtotal:'), pw.Text('\$${subtotal.toStringAsFixed(2)}')]),
+              pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [pw.Text('IVA (16%):'), pw.Text('\$${iva.toStringAsFixed(2)}')]),
+              pw.Divider(),
+              pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('TOTAL MXN:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
+                    pw.Text('\$${totalMXN.toStringAsFixed(2)}',
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
+                  ]),
+              if (divisa != 'MXN')
+                pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Total $divisa:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text(totalDivisa.toStringAsFixed(2),
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    ]),
+              pw.SizedBox(height: 20),
+              pw.Center(child: pw.Text('¡Gracias por su compra!')),
+            ],
+          );
+        },
+      ),
+    );
+    await Printing.layoutPdf(
+      onLayout: (format) async => doc.save(),
+      name: 'voucher-$folio.pdf',
+    );
+  },
+),
           ElevatedButton.icon(
             icon: const Icon(Icons.check),
             label: const Text('Cerrar'),
