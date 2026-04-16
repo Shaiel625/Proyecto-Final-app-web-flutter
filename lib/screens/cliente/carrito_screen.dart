@@ -5,6 +5,8 @@ import '../../services/carrito_service.dart';
 import '../../services/session_service.dart';
 import '../../services/venta_service.dart';
 import '../../models/compra.dart';
+import 'package:universal_html/html.dart' as html;
+
 class CarritoScreen extends StatefulWidget {
   const CarritoScreen({super.key});
 
@@ -242,16 +244,15 @@ class _CarritoScreenState extends State<CarritoScreen> {
             icon: const Icon(Icons.download_outlined),
             label: const Text('Descargar'),
             onPressed: () {
-              final folio = venta.folio.isNotEmpty ? venta.folio : venta.id;
-              Clipboard.setData(ClipboardData(text: textoVoucher.toString()));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Voucher $folio copiado — pégalo en un bloc de notas para guardar'),
-                  backgroundColor: AppTheme.primary,
-                  duration: const Duration(seconds: 4),
-                ),
-              );
-            },
+  final folio = venta.folio.isNotEmpty ? venta.folio : venta.id;
+  final bytes = textoVoucher.toString().codeUnits;
+  final blob = html.Blob([bytes], 'text/plain');
+  final url = html.Url.createObjectUrlFromBlob(blob);
+  final anchor = html.AnchorElement(href: url)
+    ..setAttribute('download', 'voucher-$folio.txt')
+    ..click();
+  html.Url.revokeObjectUrl(url);
+},
           ),
           ElevatedButton.icon(
             icon: const Icon(Icons.check),
