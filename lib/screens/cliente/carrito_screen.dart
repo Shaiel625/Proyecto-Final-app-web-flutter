@@ -1,33 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/theme/app_theme.dart';
-import '../../models/compra.dart';
 import '../../services/carrito_service.dart';
 import '../../services/session_service.dart';
 import '../../services/venta_service.dart';
-
-
+import '../../models/compra.dart';
 class CarritoScreen extends StatefulWidget {
   const CarritoScreen({super.key});
- 
+
   @override
   State<CarritoScreen> createState() => _CarritoScreenState();
 }
- 
+
 class _CarritoScreenState extends State<CarritoScreen> {
   final String _metodoPago = 'Tarjeta';
   bool _procesando = false;
- 
+
   Future<void> _comprarTodo() async {
     final carrito = CarritoService.instance;
     if (carrito.items.isEmpty) return;
- 
+
     setState(() => _procesando = true);
- 
+
     try {
       final sesion = await SessionService.obtenerSesion();
       final nombreCliente = sesion?['nombre'] ?? 'Cliente mostrador';
- 
+
       final venta = await VentaService.registrarVenta(
         vendedor: 'App Cliente',
         cliente: nombreCliente,
@@ -39,14 +37,14 @@ class _CarritoScreenState extends State<CarritoScreen> {
                 ))
             .toList(),
       );
- 
+
       // Guardar items antes de limpiar para el voucher
       final itemsVoucher = List.from(carrito.items);
       carrito.limpiar();
- 
+
       if (!mounted) return;
       await _mostrarVoucher(venta, itemsVoucher);
- 
+
       if (!mounted) return;
       Navigator.pop(context, true);
     } catch (e) {
@@ -58,10 +56,10 @@ class _CarritoScreenState extends State<CarritoScreen> {
       if (mounted) setState(() => _procesando = false);
     }
   }
- 
+
   Future<void> _mostrarVoucher(Compra venta, List itemsVoucher) async {
     final fechaStr = venta.fechaFormateada;
- 
+
     // Calcular subtotal desde items del carrito
     double subtotalVoucher = venta.total > 0 ? venta.total / 1.16 : 0;
     if (subtotalVoucher == 0) {
@@ -71,7 +69,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
     }
     final ivaVoucher = subtotalVoucher * 0.16;
     final totalVoucher = subtotalVoucher + ivaVoucher;
- 
+
     // Texto del voucher para copiar/descargar
     final textoVoucher = StringBuffer();
     textoVoucher.writeln('============================');
@@ -95,7 +93,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
     textoVoucher.writeln('TOTAL:       \$${totalVoucher.toStringAsFixed(2)}');
     textoVoucher.writeln('============================');
     textoVoucher.writeln('¡Gracias por su compra!');
- 
+
     await showDialog(
       context: context,
       barrierDismissible: false,
@@ -140,19 +138,19 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
- 
+
                 // Folio y fecha
                 _filaVoucher('Folio',
                     venta.folio.isNotEmpty ? venta.folio : venta.id),
                 _filaVoucher('Fecha', fechaStr),
                 _filaVoucher('Cliente', venta.cliente),
                 _filaVoucher('Método de pago', venta.metodoPago),
- 
+
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
                   child: Divider(),
                 ),
- 
+
                 // Items
                 const Text('Productos',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
@@ -178,7 +176,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                     ),
                   );
                 }),
- 
+
                 const Divider(),
                 // Subtotal
                 Row(
@@ -215,7 +213,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                     ),
                   ],
                 ),
- 
+
                 const SizedBox(height: 16),
                 Center(
                   child: Text('¡Gracias por su compra!',
@@ -264,7 +262,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
       ),
     );
   }
- 
+
   Widget _filaVoucher(String label, String valor) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -286,7 +284,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
       ),
     );
   }
- 
+
   void _confirmarLimpiar() {
     showDialog(
       context: context,
@@ -310,11 +308,11 @@ class _CarritoScreenState extends State<CarritoScreen> {
       ),
     );
   }
- 
+
   @override
   Widget build(BuildContext context) {
     final carrito = CarritoService.instance;
- 
+
     return ListenableBuilder(
       listenable: carrito,
       builder: (context, _) {
@@ -323,10 +321,32 @@ class _CarritoScreenState extends State<CarritoScreen> {
           0,
           (sum, item) => sum + item.producto.precioVenta * item.cantidad,
         );
- 
+
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Mi carrito'),
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Mi carrito'),
+                if (items.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${items.length}',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ]
+              ],
+            ),
             actions: [
               if (items.isNotEmpty)
                 IconButton(
@@ -381,47 +401,50 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                       ],
                                     ),
                                   ),
-                                  // Controles cantidad
-Row(
-  children: [
-    IconButton(
-      icon: const Icon(Icons.remove_circle_outline),
-      color: AppTheme.primary,
-      onPressed: () =>
-          carrito.disminuirCantidad(item.producto),
-    ),
-    SizedBox(
-      width: 50,
-      child: TextField(
-        controller: TextEditingController(
-            text: '${item.cantidad}')
-          ..selection = TextSelection.collapsed(
-              offset: '${item.cantidad}'.length),
-        keyboardType: TextInputType.number,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-            fontWeight: FontWeight.bold, fontSize: 16),
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
-          contentPadding: EdgeInsets.symmetric(vertical: 6),
-          isDense: true,
-        ),
-        onChanged: (v) {
-          final n = int.tryParse(v);
-          if (n != null && n > 0) {
-            carrito.actualizarCantidad(item.producto, n);
-          }
-        },
-      ),
-    ),
-    IconButton(
-      icon: const Icon(Icons.add_circle_outline),
-      color: AppTheme.primary,
-      onPressed: () =>
-          carrito.agregarProducto(item.producto),
-    ),
-  ],
-),
+                                  // Controles cantidad con campo editable
+                                  Row(
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.remove_circle_outline),
+                                        color: AppTheme.primary,
+                                        onPressed: () =>
+                                            carrito.disminuirCantidad(item.producto),
+                                      ),
+                                      SizedBox(
+                                        width: 52,
+                                        child: TextField(
+                                          controller: TextEditingController(
+                                              text: '${item.cantidad}')
+                                            ..selection = TextSelection.collapsed(
+                                                offset: '${item.cantidad}'.length),
+                                          keyboardType: TextInputType.number,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16),
+                                          decoration: const InputDecoration(
+                                            border: OutlineInputBorder(),
+                                            contentPadding: EdgeInsets.symmetric(
+                                                vertical: 6),
+                                            isDense: true,
+                                          ),
+                                          onChanged: (v) {
+                                            final n = int.tryParse(v);
+                                            if (n != null && n > 0) {
+                                              carrito.actualizarCantidad(
+                                                  item.producto, n);
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.add_circle_outline),
+                                        color: AppTheme.primary,
+                                        onPressed: () =>
+                                            carrito.agregarProducto(item.producto),
+                                      ),
+                                    ],
+                                  ),
                                   SizedBox(
                                     width: 80,
                                     child: Text(
