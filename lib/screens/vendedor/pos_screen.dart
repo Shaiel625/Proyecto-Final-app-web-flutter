@@ -691,10 +691,12 @@ class _PosScreenState extends State<PosScreen> {
         },
       ),
     );
-    await Printing.layoutPdf(
-      onLayout: (format) async => doc.save(),
-      name: 'voucher-$folio.pdf',
-    );
+    final bytes = await doc.save();
+
+await Printing.sharePdf(
+  bytes: bytes,
+  filename: 'venta.pdf',
+);
   },
 ),
           ElevatedButton.icon(
