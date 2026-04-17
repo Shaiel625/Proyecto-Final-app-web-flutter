@@ -1,8 +1,9 @@
+import 'dart:convert';
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import '../../models/compra.dart';
 import '../../services/venta_service.dart';
 
@@ -41,14 +42,14 @@ class _VendedorSalesScreenState extends State<VendedorSalesScreen> {
     var lista = List<Compra>.from(ventas);
     if (_search.trim().isNotEmpty) {
       final texto = _search.toLowerCase();
-      lista = lista.where((v) =>
-          v.folio.toLowerCase().contains(texto) ||
-          v.cliente.toLowerCase().contains(texto) ||
-          v.metodoPago.toLowerCase().contains(texto) ||
-          v.vendedor.toLowerCase().contains(texto)).toList();
+      lista = lista.where((venta) =>
+          venta.folio.toLowerCase().contains(texto) ||
+          venta.cliente.toLowerCase().contains(texto) ||
+          venta.metodoPago.toLowerCase().contains(texto) ||
+          venta.vendedor.toLowerCase().contains(texto)).toList();
     }
     if (_metodoFiltro != 'Todos') {
-      lista = lista.where((v) => v.metodoPago == _metodoFiltro).toList();
+      lista = lista.where((venta) => venta.metodoPago == _metodoFiltro).toList();
     }
     lista.sort((a, b) {
       final fa = a.fechaDate ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -59,9 +60,40 @@ class _VendedorSalesScreenState extends State<VendedorSalesScreen> {
   }
 
   double _calcularTotal(List<Compra> ventas) =>
-      ventas.fold(0, (sum, v) => sum + v.total);
+      ventas.fold(0, (sum, venta) => sum + venta.total);
 
-  // ── PDF ─────────────────────────────────────────────────────────────────
+  // ── CSV (funciona en web con dart:html) ──────────────────────────────────
+  void _exportarCsv(List<Compra> ventas) {
+    if (ventas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay ventas para exportar')),
+      );
+      return;
+    }
+    final buffer = StringBuffer();
+    buffer.writeln('Folio,Cliente,Vendedor,Fecha,Metodo de pago,Estado,Total,Productos');
+    for (final venta in ventas) {
+      final productos = venta.items.isEmpty
+          ? ''
+          : venta.items.map((item) =>
+              '${item.nombre} x${item.cantidad} (\$${item.subtotal.toStringAsFixed(2)})').join(' | ');
+      buffer.writeln('"${venta.folio}","${venta.cliente}","${venta.vendedor}",'
+          '"${venta.fechaFormateada}","${venta.metodoPago}","${venta.estado}",'
+          '"${venta.total.toStringAsFixed(2)}","$productos"');
+    }
+    final bytes = utf8.encode(buffer.toString());
+    final blob = html.Blob([bytes], 'text/csv;charset=utf-8;');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.AnchorElement(href: url)
+      ..setAttribute('download', 'ventas_exportadas.csv')
+      ..click();
+    html.Url.revokeObjectUrl(url);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('CSV descargado correctamente')),
+    );
+  }
+
+  // ── PDF con logo y gráficas (descarga via dart:html) ────────────────────
   Future<void> _exportarPdf(List<Compra> ventas) async {
     if (ventas.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -70,56 +102,56 @@ class _VendedorSalesScreenState extends State<VendedorSalesScreen> {
       return;
     }
 
-    final doc = pw.Document();
-
-    pw.ImageProvider? logoImage;
     try {
-      final data = await rootBundle.load('assets/images/logo.png');
-      logoImage = pw.MemoryImage(data.buffer.asUint8List());
-    } catch (_) {}
+      final doc = pw.Document();
 
-    const azul      = PdfColor.fromInt(0xFF1F4A7C);
-    const azulClaro = PdfColor.fromInt(0xFFD5E8F0);
-    const gris      = PdfColor.fromInt(0xFF888888);
-    const grisClaro = PdfColor.fromInt(0xFFF2F2F2);
-    const verde     = PdfColor.fromInt(0xFF1E8449);
-    const naranja   = PdfColor.fromInt(0xFFE8A020);
-    const rojo      = PdfColor.fromInt(0xFFC0392B);
-    const morado    = PdfColor.fromInt(0xFF6C3483);
+      pw.ImageProvider? logoImage;
+      try {
+        final data = await rootBundle.load('assets/images/logo.png');
+        logoImage = pw.MemoryImage(data.buffer.asUint8List());
+      } catch (_) {}
 
-    final metodoColors = {
-      'Efectivo': azul, 'Tarjeta': verde, 'Transferencia': naranja,
-    };
+      const azul      = PdfColor.fromInt(0xFF1F4A7C);
+      const azulClaro = PdfColor.fromInt(0xFFD5E8F0);
+      const gris      = PdfColor.fromInt(0xFF888888);
+      const grisClaro = PdfColor.fromInt(0xFFF2F2F2);
+      const verde     = PdfColor.fromInt(0xFF1E8449);
+      const naranja   = PdfColor.fromInt(0xFFE8A020);
+      const morado    = PdfColor.fromInt(0xFF6C3483);
+      const rojo      = PdfColor.fromInt(0xFFC0392B);
 
-    // Barras por día
-    final ventasPorDia = <String, double>{};
-    for (final v in ventas) {
-      final f = v.fechaDate;
-      if (f != null) {
-        final dia = '${f.day.toString().padLeft(2,'0')}/${f.month.toString().padLeft(2,'0')}';
-        ventasPorDia[dia] = (ventasPorDia[dia] ?? 0) + v.total;
+      final metodoColors = {
+        'Efectivo': azul, 'Tarjeta': verde, 'Transferencia': naranja,
+      };
+
+      // Datos barras por día
+      final ventasPorDia = <String, double>{};
+      for (final v in ventas) {
+        final f = v.fechaDate;
+        if (f != null) {
+          final dia = '${f.day.toString().padLeft(2,'0')}/${f.month.toString().padLeft(2,'0')}';
+          ventasPorDia[dia] = (ventasPorDia[dia] ?? 0) + v.total;
+        }
       }
-    }
-    final diasOrdenados = ventasPorDia.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
-    final maxBar = diasOrdenados.fold<double>(1, (m, e) => e.value > m ? e.value : m);
+      final diasOrdenados = ventasPorDia.entries.toList()
+        ..sort((a, b) => a.key.compareTo(b.key));
+      final maxBar = diasOrdenados.fold<double>(1, (m, e) => e.value > m ? e.value : m);
 
-    // Pastel
-    final porMetodo = <String, double>{};
-    for (final v in ventas) {
-      porMetodo[v.metodoPago] = (porMetodo[v.metodoPago] ?? 0) + v.total;
-    }
-    final totalGeneral = _calcularTotal(ventas);
-    final pieEntries = porMetodo.entries.toList();
+      // Datos pastel
+      final porMetodo = <String, double>{};
+      for (final v in ventas) {
+        porMetodo[v.metodoPago] = (porMetodo[v.metodoPago] ?? 0) + v.total;
+      }
+      final totalGeneral = _calcularTotal(ventas);
+      final pieEntries = porMetodo.entries.toList();
+      final totalEfectivo = porMetodo['Efectivo'] ?? 0;
+      final totalTarjeta  = porMetodo['Tarjeta']  ?? 0;
 
-    final totalEfectivo = porMetodo['Efectivo']      ?? 0;
-    final totalTarjeta  = porMetodo['Tarjeta']       ?? 0;
-    final now = DateTime.now();
-    final fechaReporte =
-        '${now.day.toString().padLeft(2,'0')}/${now.month.toString().padLeft(2,'0')}/${now.year}';
+      final now = DateTime.now();
+      final fechaReporte =
+          '${now.day.toString().padLeft(2,'0')}-${now.month.toString().padLeft(2,'0')}-${now.year}';
 
-    doc.addPage(
-      pw.MultiPage(
+      doc.addPage(pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
         header: (ctx) => pw.Container(
@@ -133,14 +165,12 @@ class _VendedorSalesScreenState extends State<VendedorSalesScreen> {
                 if (logoImage != null)
                   pw.Image(logoImage, width: 44, height: 44)
                 else
-                  pw.Container(
-                    width: 44, height: 44,
+                  pw.Container(width: 44, height: 44,
                     decoration: const pw.BoxDecoration(color: azul,
                         borderRadius: pw.BorderRadius.all(pw.Radius.circular(8))),
                     child: pw.Center(child: pw.Text('FS',
                         style: pw.TextStyle(color: PdfColors.white,
-                            fontWeight: pw.FontWeight.bold, fontSize: 16))),
-                  ),
+                            fontWeight: pw.FontWeight.bold, fontSize: 16)))),
                 pw.SizedBox(width: 10),
                 pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
                   pw.Text('FerreSmart', style: pw.TextStyle(fontSize: 16,
@@ -173,7 +203,6 @@ class _VendedorSalesScreenState extends State<VendedorSalesScreen> {
           ),
         ),
         build: (ctx) => [
-
           // Tarjetas resumen
           pw.Row(children: [
             _tarjetaResumen('Total Ventas', '${ventas.length}', azul),
@@ -186,156 +215,143 @@ class _VendedorSalesScreenState extends State<VendedorSalesScreen> {
           ]),
           pw.SizedBox(height: 20),
 
-          // Gráficas
+          // Título gráficas
           pw.Text('Análisis de Ventas', style: pw.TextStyle(fontSize: 13,
               fontWeight: pw.FontWeight.bold, color: azul)),
           pw.SizedBox(height: 4),
           pw.Divider(color: azul, thickness: 1),
           pw.SizedBox(height: 12),
 
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-
-              // Gráfica de barras — ventas por día
-              pw.Expanded(
-                flex: 3,
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text('Ventas por Día (MXN)', style: pw.TextStyle(
-                        fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
-                    pw.SizedBox(height: 8),
-                    if (diasOrdenados.isEmpty)
-                      pw.Text('Sin datos', style: const pw.TextStyle(fontSize: 9, color: gris))
-                    else
-                      ...diasOrdenados.map((e) {
-                        final pct = (maxBar > 0 ? e.value / maxBar : 0.0).clamp(0.0, 1.0);
-                        return pw.Padding(
-                          padding: const pw.EdgeInsets.only(bottom: 7),
-                          child: pw.Column(
-                            crossAxisAlignment: pw.CrossAxisAlignment.start,
-                            children: [
-                              pw.Text(e.key, style: const pw.TextStyle(fontSize: 8)),
-                              pw.SizedBox(height: 2),
-                              pw.Row(children: [
-                                pw.Expanded(
-                                  // LayoutBuilder para obtener ancho real
-                                  child: pw.LayoutBuilder(
-                                    builder: (ctx, constraints) {
-                                      final totalW = constraints?.maxWidth ?? 200;
-                                      final barW = totalW * pct;
-                                      return pw.SizedBox(
-                                        height: 14,
-                                        child: pw.CustomPaint(
-                                          size: PdfPoint(totalW, 14),
-                                          painter: (canvas, size) {
-                                            // Fondo gris
-                                            canvas.setFillColor(grisClaro);
-                                            canvas.drawRRect(0, 0, size.x, 14, 3, 3);
-                                            canvas.fillPath();
-                                            // Barra azul
-                                            if (barW > 0) {
-                                              canvas.setFillColor(azul);
-                                              canvas.drawRRect(0, 0, barW, 14, 3, 3);
-                                              canvas.fillPath();
-                                            }
-                                          },
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                pw.SizedBox(width: 4),
-                                pw.Text('\$${e.value.toStringAsFixed(0)}',
-                                    style: pw.TextStyle(fontSize: 7,
-                                        fontWeight: pw.FontWeight.bold, color: azul)),
-                              ]),
-                            ],
-                          ),
-                        );
-                      }),
-                  ],
-                ),
-              ),
-              pw.SizedBox(width: 20),
-
-              // Gráfica de pastel
-              pw.Expanded(
-                flex: 2,
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.center,
-                  children: [
-                    pw.Text('Por Método de Pago', style: pw.TextStyle(
-                        fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
-                    pw.SizedBox(height: 8),
-                    pw.SizedBox(
-                      width: 110, height: 110,
-                      child: pw.CustomPaint(
-                        painter: (canvas, size) {
-                          final cx = size.x / 2;
-                          final cy = size.y / 2;
-                          final r = size.x / 2 * 0.88;
-                          final colors = [azul, verde, naranja, morado, rojo];
-                          double start = -3.14159 / 2;
-                          final tot = pieEntries.fold<double>(0.0, (s, e) => s + e.value);
-                          for (int i = 0; i < pieEntries.length; i++) {
-                            final sweep = tot > 0
-                                ? (pieEntries[i].value / tot) * 2 * 3.14159
-                                : 0.0;
-                            canvas.setFillColor(colors[i % colors.length]);
-                            canvas.moveTo(cx, cy);
-                            canvas.bezierArc(
-                              cx + r * _cosA(start), cy + r * _sinA(start),
-                              r, r,
-                              cx + r * _cosA(start + sweep), cy + r * _sinA(start + sweep),
-                              large: sweep > 3.14159,
-                            );
-                            canvas.lineTo(cx, cy);
-                            canvas.fillPath();
-                            start += sweep;
-                          }
-                          canvas.setFillColor(PdfColors.white);
-                          canvas.drawEllipse(cx, cy, r * 0.42, r * 0.42);
-                          canvas.fillPath();
-                        },
-                      ),
-                    ),
-                    pw.SizedBox(height: 6),
-                    ...pieEntries.asMap().entries.map((entry) {
-                      final colors = [azul, verde, naranja, morado, rojo];
-                      final color = colors[entry.key % colors.length];
-                      final pct = totalGeneral > 0
-                          ? (entry.value.value / totalGeneral * 100).toStringAsFixed(1)
-                          : '0';
+          pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            // Barras por día
+            pw.Expanded(
+              flex: 3,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Ventas por Día (MXN)', style: pw.TextStyle(fontSize: 10,
+                      fontWeight: pw.FontWeight.bold, color: azul)),
+                  pw.SizedBox(height: 8),
+                  if (diasOrdenados.isEmpty)
+                    pw.Text('Sin datos', style: const pw.TextStyle(fontSize: 9, color: gris))
+                  else
+                    ...diasOrdenados.map((e) {
+                      final pct = (maxBar > 0 ? e.value / maxBar : 0.0).clamp(0.0, 1.0);
+                      // Barra de ancho fijo (200pt máximo)
+                      final barMaxW = 160.0;
+                      final barW = barMaxW * pct;
                       return pw.Padding(
-                        padding: const pw.EdgeInsets.only(bottom: 3),
-                        child: pw.Row(children: [
-                          pw.Container(width: 10, height: 10,
-                              decoration: pw.BoxDecoration(color: color,
-                                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)))),
-                          pw.SizedBox(width: 4),
-                          pw.Expanded(child: pw.Text(entry.value.key,
-                              style: const pw.TextStyle(fontSize: 8))),
-                          pw.Text('$pct%', style: pw.TextStyle(fontSize: 8,
-                              fontWeight: pw.FontWeight.bold, color: color)),
-                        ]),
+                        padding: const pw.EdgeInsets.only(bottom: 7),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(e.key, style: const pw.TextStyle(fontSize: 8)),
+                            pw.SizedBox(height: 2),
+                            pw.Row(children: [
+                              pw.SizedBox(
+                                width: barMaxW,
+                                height: 14,
+                                child: pw.CustomPaint(
+                                  painter: (canvas, size) {
+                                    canvas.setFillColor(grisClaro);
+                                    canvas.drawRRect(0, 0, size.x, 14, 3, 3);
+                                    canvas.fillPath();
+                                    if (barW > 0) {
+                                      canvas.setFillColor(azul);
+                                      canvas.drawRRect(0, 0, barW, 14, 3, 3);
+                                      canvas.fillPath();
+                                    }
+                                  },
+                                ),
+                              ),
+                              pw.SizedBox(width: 4),
+                              pw.Text('\$${e.value.toStringAsFixed(0)}',
+                                  style: pw.TextStyle(fontSize: 7,
+                                      fontWeight: pw.FontWeight.bold, color: azul)),
+                            ]),
+                          ],
+                        ),
                       );
                     }),
-                  ],
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+            pw.SizedBox(width: 20),
+
+            // Pastel método de pago
+            pw.Expanded(
+              flex: 2,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Text('Por Método de Pago', style: pw.TextStyle(fontSize: 10,
+                      fontWeight: pw.FontWeight.bold, color: azul)),
+                  pw.SizedBox(height: 8),
+                  pw.SizedBox(
+                    width: 110, height: 110,
+                    child: pw.CustomPaint(
+                      painter: (canvas, size) {
+                        final cx = size.x / 2;
+                        final cy = size.y / 2;
+                        final r = size.x / 2 * 0.88;
+                        final colors = [azul, verde, naranja, morado, rojo];
+                        double start = -3.14159 / 2;
+                        final tot = pieEntries.fold<double>(0.0, (s, e) => s + e.value);
+                        for (int i = 0; i < pieEntries.length; i++) {
+                          final sweep = tot > 0
+                              ? (pieEntries[i].value / tot) * 2 * 3.14159
+                              : 0.0;
+                          canvas.setFillColor(colors[i % colors.length]);
+                          canvas.moveTo(cx, cy);
+                          canvas.bezierArc(
+                            cx + r * _cosA(start), cy + r * _sinA(start),
+                            r, r,
+                            cx + r * _cosA(start + sweep), cy + r * _sinA(start + sweep),
+                            large: sweep > 3.14159,
+                          );
+                          canvas.lineTo(cx, cy);
+                          canvas.fillPath();
+                          start += sweep;
+                        }
+                        canvas.setFillColor(PdfColors.white);
+                        canvas.drawEllipse(cx, cy, r * 0.42, r * 0.42);
+                        canvas.fillPath();
+                      },
+                    ),
+                  ),
+                  pw.SizedBox(height: 6),
+                  ...pieEntries.asMap().entries.map((entry) {
+                    final colors = [azul, verde, naranja, morado, rojo];
+                    final color = colors[entry.key % colors.length];
+                    final pct = totalGeneral > 0
+                        ? (entry.value.value / totalGeneral * 100).toStringAsFixed(1)
+                        : '0';
+                    return pw.Padding(
+                      padding: const pw.EdgeInsets.only(bottom: 3),
+                      child: pw.Row(children: [
+                        pw.Container(width: 10, height: 10,
+                            decoration: pw.BoxDecoration(color: color,
+                                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)))),
+                        pw.SizedBox(width: 4),
+                        pw.Expanded(child: pw.Text(entry.value.key,
+                            style: const pw.TextStyle(fontSize: 8))),
+                        pw.Text('$pct%', style: pw.TextStyle(fontSize: 8,
+                            fontWeight: pw.FontWeight.bold, color: color)),
+                      ]),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ]),
           pw.SizedBox(height: 24),
 
-          // Tabla de ventas
+          // Tabla ventas
           pw.Text('Detalle de Ventas', style: pw.TextStyle(fontSize: 13,
               fontWeight: pw.FontWeight.bold, color: azul)),
           pw.SizedBox(height: 4),
           pw.Divider(color: azul, thickness: 1),
           pw.SizedBox(height: 8),
-
           pw.Table(
             border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
             columnWidths: {
@@ -391,8 +407,7 @@ class _VendedorSalesScreenState extends State<VendedorSalesScreen> {
                 decoration: const pw.BoxDecoration(color: azulClaro),
                 children: [
                   _celda('TOTAL', bold: true, size: 8),
-                  _celda('', size: 8),
-                  _celda('', size: 8),
+                  _celda('', size: 8), _celda('', size: 8),
                   _celda('${ventas.length} ventas', bold: true, size: 8),
                   _celda('', size: 8),
                   pw.Padding(
@@ -406,14 +421,32 @@ class _VendedorSalesScreenState extends State<VendedorSalesScreen> {
             ],
           ),
         ],
-      ),
-    );
+      ));
 
-    final bytes = await doc.save();
-await Printing.sharePdf(
-  bytes: bytes,
-  filename: 'reporte-ventas-$fechaReporte.pdf',
-);
+      // Usar dart:html para descargar (igual que el CSV — esto SÍ funciona en Flutter Web)
+      final pdfBytes = await doc.save();
+      final blob = html.Blob([pdfBytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      html.AnchorElement(href: url)
+        ..setAttribute('download', 'reporte-ventas-$fechaReporte.pdf')
+        ..click();
+      html.Url.revokeObjectUrl(url);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PDF descargado correctamente'),
+              backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      debugPrint('ERROR PDF: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al generar PDF: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   pw.Widget _tarjetaResumen(String label, String valor, PdfColor color) {
@@ -473,7 +506,8 @@ await Printing.sharePdf(
                 const SizedBox(height: 8),
                 Text('Estado: ${venta.estado}'),
                 const SizedBox(height: 14),
-                const Text('Productos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const Text('Productos',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 10),
                 if (venta.items.isEmpty)
                   const Text('No hay detalle de productos')
@@ -485,7 +519,8 @@ await Printing.sharePdf(
                       decoration: BoxDecoration(color: Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(12)),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(item.nombre,
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
                         Text('Código: ${item.codigo}'),
                         Text('Cantidad: ${item.cantidad}'),
@@ -553,27 +588,40 @@ await Printing.sharePdf(
                       Text('\$${totalVendido.toStringAsFixed(2)}',
                           style: const TextStyle(fontSize: 26,
                               fontWeight: FontWeight.bold, color: Color(0xFF1F4A7C))),
-                      const SizedBox(height: 4),
-                      Text('${ventas.length} venta(s)',
-                          style: const TextStyle(fontSize: 13, color: Colors.grey)),
                     ]),
                   ),
                   const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _exportarPdf(ventas),
-                      icon: const Icon(Icons.picture_as_pdf_outlined),
-                      label: const Text('Exportar Reporte PDF'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1F4A7C),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+
+                  // Botones exportar
+                  Row(children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _exportarCsv(ventas),
+                        icon: const Icon(Icons.table_chart_outlined),
+                        label: const Text('Exportar CSV'),
+                        style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12))),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _exportarPdf(ventas),
+                        icon: const Icon(Icons.picture_as_pdf_outlined),
+                        label: const Text('Exportar PDF'),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1F4A7C),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12))),
+                      ),
+                    ),
+                  ]),
                   const SizedBox(height: 16),
+
                   TextField(
                     controller: _searchCtrl,
                     decoration: InputDecoration(
@@ -585,31 +633,31 @@ await Printing.sharePdf(
                     onChanged: (value) => setState(() => _search = value),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: _metodoFiltro,
-                          decoration: InputDecoration(labelText: 'Método de pago',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14))),
-                          items: const [
-                            DropdownMenuItem(value: 'Todos', child: Text('Todos')),
-                            DropdownMenuItem(value: 'Efectivo', child: Text('Efectivo')),
-                            DropdownMenuItem(value: 'Tarjeta', child: Text('Tarjeta')),
-                            DropdownMenuItem(value: 'Transferencia', child: Text('Transferencia')),
-                          ],
-                          onChanged: (v) => setState(() => _metodoFiltro = v ?? 'Todos'),
-                        ),
+                  Row(children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _metodoFiltro,
+                        decoration: InputDecoration(labelText: 'Método de pago',
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14))),
+                        items: const [
+                          DropdownMenuItem(value: 'Todos', child: Text('Todos')),
+                          DropdownMenuItem(value: 'Efectivo', child: Text('Efectivo')),
+                          DropdownMenuItem(value: 'Tarjeta', child: Text('Tarjeta')),
+                          DropdownMenuItem(value: 'Transferencia', child: Text('Transferencia')),
+                        ],
+                        onChanged: (value) => setState(() => _metodoFiltro = value ?? 'Todos'),
                       ),
-                      const SizedBox(width: 12),
-                      IconButton(
-                        onPressed: () => setState(() => _ordenDescendente = !_ordenDescendente),
-                        icon: Icon(_ordenDescendente ? Icons.arrow_downward : Icons.arrow_upward),
-                        tooltip: 'Ordenar por fecha',
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 12),
+                    IconButton(
+                      onPressed: () => setState(() => _ordenDescendente = !_ordenDescendente),
+                      icon: Icon(_ordenDescendente ? Icons.arrow_downward : Icons.arrow_upward),
+                      tooltip: 'Ordenar por fecha',
+                    ),
+                  ]),
                   const SizedBox(height: 16),
+
                   Expanded(
                     child: ventas.isEmpty
                         ? ListView(children: const [
