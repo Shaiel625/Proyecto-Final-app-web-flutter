@@ -409,10 +409,11 @@ class _VendedorSalesScreenState extends State<VendedorSalesScreen> {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => doc.save(),
-      name: 'reporte-ventas-$fechaReporte.pdf',
-    );
+    final bytes = await doc.save();
+await Printing.sharePdf(
+  bytes: bytes,
+  filename: 'reporte-ventas-$fechaReporte.pdf',
+);
   }
 
   pw.Widget _tarjetaResumen(String label, String valor, PdfColor color) {
